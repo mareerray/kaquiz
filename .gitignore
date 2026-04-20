@@ -1,0 +1,26 @@
+# ===== BACKEND =====
+backend/.env
+backend/tmp/
+
+# Go dependencies (downloaded automatically)
+backend/vendor/
+
+# ===== FRONTEND =====
+# Flutter/Dart generated files
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/key.properties
+frontend/ios/.symlinks/
+frontend/ios/Pods/
+frontend/ios/Flutter/Flutter.framework
+frontend/ios/Flutter/Flutter.podspec
+frontend/.env
+
+# ===== GENERAL =====
+.DS_Store
+*.log
