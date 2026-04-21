@@ -27,11 +27,17 @@ class _LoginScreenState extends State<LoginScreen> {
       final jwtToken = await _apiService.authenticateWithBackend(idToken);
       
       if (jwtToken != null && mounted) {
-        // Nav to Map Screen (replace to prevent going back to login via back button)
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MapScreen()),
-        );
+        if (jwtToken.startsWith('ERROR:')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text(jwtToken)),
+          );
+        } else {
+          // Nav to Map Screen (replace to prevent going back to login via back button)
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MapScreen()),
+          );
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

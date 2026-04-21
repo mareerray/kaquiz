@@ -30,11 +30,11 @@ class ApiService {
         return data['access_token'];
       } else {
         print("Backend Auth Error: ${response.statusCode} - ${response.body}");
-        return null;
+        return "ERROR: HTTP ${response.statusCode} - ${response.body}";
       }
     } catch (e) {
       print("API Serivce Error: $e");
-      return null;
+      return "ERROR: API Exception $e";
     }
   }
 }
