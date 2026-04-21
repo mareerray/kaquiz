@@ -7,8 +7,11 @@ class ApiService {
   // Defaulting to 127.0.0.1 for local emulator testing if no .env is provided
   String get baseUrl {
     if (dotenv.isInitialized) {
-      return dotenv.env['API_URL'] ?? 'http://127.0.0.1:8080';
+      final url = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8080';
+      print("🌐 Using baseUrl: $url");  // ← BEFORE return
+      return url;    
     }
+    print("🌐 dotenv NOT initialized! Using fallback");
     return 'http://127.0.0.1:8080';
   }
 
