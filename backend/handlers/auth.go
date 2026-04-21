@@ -1,49 +1,73 @@
 package handlers
 
 import (
-	"context"
-	"encoding/json"
-	"net/http"
-	"os"
-	"time"
-	"fmt"
+    "context"
+    "encoding/json"
+    "net/http"
+    "os"
+    "time"
+    "fmt"
 
-	"kaquiz-backend/db"
+    "kaquiz-backend/db"
 
-	"github.com/golang-jwt/jwt/v5"
-	"google.golang.org/api/idtoken"
+    "github.com/golang-jwt/jwt/v5"
+    "google.golang.org/api/idtoken"
 )
 
 // What Flutter sends
 type AuthRequest struct {
-	IDToken string `json:"id_token"`
+    IDToken string `json:"id_token"`
 }
 
 // What we return
 type AuthResponse struct {
-	AccessToken string `json:"access_token"`
+    AccessToken string `json:"access_token"`
 }
 
 func Auth(w http.ResponseWriter, r *http.Request) {
-	// 1. Read the request body
-	var req AuthRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || req.IDToken == "" {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
+    // 1. Read the request body
+    var req AuthRequest
+    err := json.NewDecoder(r.Body).Decode(&req)
+    if err != nil || req.IDToken == "" {
+        http.Error(w, "Invalid request", http.StatusBadRequest)
+        return
+    }
 
-	// 2. Verify Google token
-	payload, err := idtoken.Validate(context.Background(), req.IDToken, os.Getenv("GOOGLE_CLIENT_ID"))
-	if err != nil {
-		http.Error(w, "Invalid Google token", http.StatusBadRequest)
-		return
-	}
+    // 2. Verify Google token
+// 2. Verify Google token - try both Web and iOS client IDs
+    clientIDs := []string{
+        os.Getenv("GOOGLE_CLIENT_ID"),
+        os.Getenv("GOOGLE_IOS_CLIENT_ID"),
+    }
 
-	// 3. Get user info from Google token
-	email := payload.Claims["email"].(string)
-	name, _ := payload.Claims["name"].(string)
-	avatar, _ := payload.Claims["picture"].(string)
+    var payload *idtoken.Payload
+    for _, clientID := range clientIDs {
+        if clientID == "" {
+            continue
+        }
+        payload, err = idtoken.Validate(context.Background(), req.IDToken, clientID)
+        if err == nil {
+            break // ✅ found a match!
+        }
+    }
+
+    if payload == nil {
+        http.Error(w, "Invalid Google token", http.StatusBadRequest)
+        return
+    }
+
+
+
+    // payload, err := idtoken.Validate(context.Background(), req.IDToken, os.Getenv("GOOGLE_CLIENT_ID"))
+    // if err != nil {
+    //     http.Error(w, "Invalid Google token", http.StatusBadRequest)
+    //     return
+    // }
+
+    // 3. Get user info from Google token
+    email := payload.Claims["email"].(string)
+    name, _ := payload.Claims["name"].(string)
+    avatar, _ := payload.Claims["picture"].(string)
 
 	// 4. Check if user exists, if not create them
 	var userID int
