@@ -12,6 +12,8 @@ class AuthService {
   Future<String?> signInWithGoogle() async {
     try {
       print("🔵 Starting Google Sign In...");
+      // Force sign out first to clear any cached tokens with wrong audiences
+      await _googleSignIn.signOut();
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
       if (account == null) {
