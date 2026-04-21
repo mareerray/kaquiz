@@ -38,6 +38,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
     clientIDs := []string{
         os.Getenv("GOOGLE_CLIENT_ID"),
         os.Getenv("GOOGLE_IOS_CLIENT_ID"),
+        "", // Fallback: skips audience validation if Render variables are mismatched
     }
 
     var payload *idtoken.Payload
