@@ -34,11 +34,35 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Verify Google token
-	payload, err := idtoken.Validate(context.Background(), req.IDToken, os.Getenv("GOOGLE_CLIENT_ID"))
-	if err != nil {
+// 2. Verify Google token - try both Web and iOS client IDs
+	clientIDs := []string{
+		os.Getenv("GOOGLE_CLIENT_ID"),
+		os.Getenv("GOOGLE_IOS_CLIENT_ID"),
+	}
+
+	var payload *idtoken.Payload
+	for _, clientID := range clientIDs {
+		if clientID == "" {
+			continue
+		}
+		payload, err = idtoken.Validate(context.Background(), req.IDToken, clientID)
+		if err == nil {
+			break // ✅ found a match!
+		}
+	}
+
+	if payload == nil {
 		http.Error(w, "Invalid Google token", http.StatusBadRequest)
 		return
 	}
+
+
+
+	// payload, err := idtoken.Validate(context.Background(), req.IDToken, os.Getenv("GOOGLE_CLIENT_ID"))
+	// if err != nil {
+	// 	http.Error(w, "Invalid Google token", http.StatusBadRequest)
+	// 	return
+	// }
 
 	// 3. Get user info from Google token
 	email := payload.Claims["email"].(string)
