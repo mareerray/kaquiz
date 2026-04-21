@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"fmt"
 
 	"kaquiz-backend/db"
 
@@ -54,8 +55,9 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		email, name, avatar,
 	).Scan(&userID)
 	if err != nil {
+		fmt.Println("❌ DB Error:", err)  // ← add this
 		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
+		return	
 	}
 
 	// 5. Create JWT token
