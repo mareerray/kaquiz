@@ -37,5 +37,23 @@ class ApiService {
       return "ERROR: API Exception $e";
     }
   }
+
+  Future<bool> updateUserLocation(double lat, double lng) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/locations'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'latitude': lat,
+          'longitude': lng,
+        }),
+      );
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print("API Service Error (Location): $e");
+      return false;
+    }
+  }
 }
 
