@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import 'map_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
   final ApiService _apiService = ApiService();
+  final SessionService _session = SessionService();
   bool _isLoading = false;
 
   void _handleGoogleSignIn() async {
@@ -32,10 +34,13 @@ class _LoginScreenState extends State<LoginScreen> {
              SnackBar(content: Text(jwtToken)),
           );
         } else {
+          // Save to session
+          _session.setToken(jwtToken);
+
           // Nav to Map Screen (replace to prevent going back to login via back button)
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const MapScreen()),
+            MaterialPageRoute(builder: (context) => MapScreen()),
           );
         }
       } else {
