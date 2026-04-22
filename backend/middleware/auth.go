@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -42,7 +43,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		// Extract userID and pass it to the next handler
 		claims := token.Claims.(jwt.MapClaims)
-		userID := claims["user_id"].(string)
+		userID := fmt.Sprintf("%v", claims["user_id"]) //safely converts any number to a string
 		ctx := context.WithValue(r.Context(), UserIDKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

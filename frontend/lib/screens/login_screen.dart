@@ -25,6 +25,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (idToken != null) {
       // 2. Send to Backend
       final jwtToken = await _apiService.authenticateWithBackend(idToken);
+
+      print("🔑 JWT TOKEN: $jwtToken");
       
       if (jwtToken != null && mounted) {
         if (jwtToken.startsWith('ERROR:')) {

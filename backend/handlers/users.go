@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"fmt"
 
 	"kaquiz-backend/db"
 	"kaquiz-backend/middleware"
@@ -44,6 +45,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 func SearchUsers(w http.ResponseWriter, r *http.Request) {
 	// Get email from query: /users/search?email=maire@gmail.com
 	email := r.URL.Query().Get("email")
+	fmt.Println("🔍 Search request for email:", email) 
 	if email == "" {
 		http.Error(w, "Email is required", http.StatusBadRequest)
 		return
@@ -59,9 +61,12 @@ func SearchUsers(w http.ResponseWriter, r *http.Request) {
 	).Scan(&id, &name, &avatar, &userEmail)
 
 	if err != nil {
+		fmt.Println("❌ User not found for email:", email)
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
+
+	fmt.Println("✅ Found user:", name, id)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
