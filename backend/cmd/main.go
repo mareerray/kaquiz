@@ -33,7 +33,7 @@ func main() {
 	protected.Use(middleware.AuthMiddleware)
 	protected.HandleFunc("/users", handlers.UpdateUser).Methods("PUT")
 	protected.HandleFunc("/users/search", handlers.SearchUsers).Methods("GET")
-	protected.HandleFunc("/locations", handlers.UpdateLocation).Methods("PUT")
+	protected.HandleFunc("/locations", handlers.UpdateLocation).Methods("POST")
 
 	// Start server
 	fmt.Println("🚀 Server running on port 8080")
