@@ -68,7 +68,12 @@ func SendInvite(w http.ResponseWriter, r *http.Request) {
 
 func GetInvites(w http.ResponseWriter, r *http.Request) {
     // Step 1: Who is asking? Get their ID from JWT
-    userID := r.Context().Value(middleware.UserIDKey).(string)
+    userIDStr := r.Context().Value(middleware.UserIDKey).(string)
+    userID, err := strconv.Atoi(userIDStr)
+    if err != nil {
+        http.Error(w, "Invalid user ID", http.StatusBadRequest)
+        return
+    }
 
     fmt.Println("📬 Getting invites for user:", userID)
 
