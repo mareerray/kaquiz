@@ -34,6 +34,7 @@ func main() {
 	protected.HandleFunc("/users", handlers.UpdateUser).Methods("PUT")
 	protected.HandleFunc("/users/search", handlers.SearchUsers).Methods("GET")
 	protected.HandleFunc("/locations", handlers.UpdateLocation).Methods("POST")
+	protected.HandleFunc("/invites/{user_id}", handlers.SendInvite).Methods("POST")
 
 	// Start server
 	fmt.Println("🚀 Server running on port 8080")
