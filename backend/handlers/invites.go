@@ -97,7 +97,8 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
     var invites []map[string]interface{}
     for rows.Next() {
         var id, senderID int
-        var name, avatar, createdAt time.Time
+        var name, avatar string
+        var createdAt time.Time
 
         err := rows.Scan(&id, &senderID, &name, &avatar, &createdAt)
         if err != nil {
