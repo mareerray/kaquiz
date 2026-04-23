@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/location_service.dart';
 import '../services/api_service.dart';
+import 'search_screen.dart';
+import 'profile_screen.dart';
+import 'friends_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -103,6 +106,10 @@ class _MapScreenState extends State<MapScreen> {
                   icon: Icons.people,
                   onPressed: () {
                      // Nav to friends list
+                     Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => FriendsScreen()),
+                      );
                   },
                   heroTag: 'friends_list',
                 ),
@@ -118,34 +125,52 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildTopOverlay() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.search, color: Colors.white),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.search, color: Colors.black54),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => SearchScreen()),
+                  );
+                },
+                child: const Text(
                   'Search friends...',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                  style: TextStyle(color: Colors.black45, fontSize: 16),
                 ),
               ),
-              CircleAvatar(
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ProfileScreen()),
+                );
+              },
+              child: CircleAvatar(
                 radius: 18,
-                backgroundColor: Colors.white.withOpacity(0.3),
-                child: const Icon(Icons.person, color: Colors.white),
+                backgroundColor: Colors.grey.shade200,
+                child: const Icon(Icons.person, color: Colors.black54),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
