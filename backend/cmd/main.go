@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"kaquiz-backend/db"
 	"kaquiz-backend/handlers"
@@ -34,11 +35,17 @@ func main() {
 	protected.HandleFunc("/users", handlers.UpdateUser).Methods("PUT")
 	protected.HandleFunc("/users/search", handlers.SearchUsers).Methods("GET")
 	protected.HandleFunc("/locations", handlers.UpdateLocation).Methods("POST")
-	protected.HandleFunc("/invites/{user_id}", handlers.SendInvite).Methods("POST")
+	protected.HandleFunc("/invites/{user_id}", handlers.SendInvite).Methods("POST") // invites + receipeint ID in URL
+	protected.HandleFunc("/invites", handlers.GetInvites).Methods("GET")
 
 	// Start server
-	fmt.Println("🚀 Server running on port 8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	// ✅ After
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // fallback for local development
+	}
+	fmt.Println("🚀 Server running on port", port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }
 
 // // Flutter sends:        { "id_token": "google_token_here" }

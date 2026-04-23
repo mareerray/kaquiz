@@ -36,7 +36,9 @@ func SendInvite(w http.ResponseWriter, r *http.Request) {
     // Step 4: Check if invite already exists
     var existing int
     err = db.DB.QueryRow(context.Background(),
-        `SELECT COUNT(*) FROM invites WHERE sender_id = $1 AND recipient_id = $2`,
+        `SELECT COUNT(*) 
+            FROM invites 
+            WHERE sender_id = $1 AND recipient_id = $2`,
         senderID, receiverID,
     ).Scan(&existing)
 
@@ -62,4 +64,56 @@ func SendInvite(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{
         "message": "Invite sent successfully",
     })
+}
+
+func GetInvites(w http.ResponseWriter, r *http.Request) {
+    // Step 1: Who is asking? Get their ID from JWT
+    userID := r.Context().Value(middleware.UserIDKey).(string)
+
+    fmt.Println("📬 Getting invites for user:", userID)
+
+    // Step 2: Find all invites where this user is the recipient
+    rows, err := db.DB.Query(context.Background(),
+        `SELECT i.id, i.sender_id, u.name, u.avatar, i.created_at 
+            FROM invites i
+            JOIN users u ON u.id = i.sender_id
+            WHERE i.recipient_id = $1`,
+        userID,
+    )
+    if err != nil {
+        fmt.Println("❌ Failed to get invites:", err)
+        http.Error(w, "Failed to get invites", http.StatusInternalServerError)
+        return
+    }
+    defer rows.Close()
+
+    // Step 3: Build the list
+    var invites []map[string]interface{}
+    for rows.Next() {
+        var id, senderID int
+        var name, avatar, createdAt string
+
+        err := rows.Scan(&id, &senderID, &name, &avatar, &createdAt)
+        if err != nil {
+            continue
+        }
+
+        invites = append(invites, map[string]interface{}{
+            "id":         id,
+            "sender_id":  senderID,
+            "name":       name,
+            "avatar":     avatar,
+            "created_at": createdAt,
+        })
+    }
+
+    // Return empty array instead of null if no invites
+    if invites == nil {
+        invites = []map[string]interface{}{}
+    }
+
+    fmt.Println("✅ Found", len(invites), "invites")
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(invites)
 }
