@@ -6,6 +6,7 @@ import (
     "net/http"
     "strconv"
     "fmt"
+    "time"
 
     "kaquiz-backend/db"
     "kaquiz-backend/middleware"
@@ -96,10 +97,11 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
     var invites []map[string]interface{}
     for rows.Next() {
         var id, senderID int
-        var name, avatar, createdAt string
+        var name, avatar, createdAt time.Time
 
         err := rows.Scan(&id, &senderID, &name, &avatar, &createdAt)
         if err != nil {
+            fmt.Println("❌ Scan error:", err) 
             continue
         }
 
@@ -108,7 +110,7 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
             "sender_id":  senderID,
             "name":       name,
             "avatar":     avatar,
-            "created_at": createdAt,
+            "created_at": createdAt.Format("2006-01-02 15:04:05"),
         })
     }
 
