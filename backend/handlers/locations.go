@@ -29,7 +29,7 @@ func UpdateLocation(w http.ResponseWriter, r *http.Request) {
     // Step 3: Save lat, lng, and current time into the database
     _, err := db.DB.Exec(context.Background(),
         `UPDATE users SET lat = $1, lng = $2, last_seen = $3 WHERE id = $4`,
-        req.Latitude, req.Longitude, time.Now().UTC(), userID,
+        req.Latitude, req.Longitude, time.Now(), userID,
     )
     if err != nil {
         http.Error(w, "Failed to update location", http.StatusInternalServerError)
