@@ -14,26 +14,29 @@ class _FriendsScreenState extends State<FriendsScreen> {
   final ApiService _apiService = ApiService();
   bool _isLoading = true;
   List<dynamic> _friends = [];
+  int _pendingCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadFriends();
+    _loadData();
   }
 
-  Future<void> _loadFriends() async {
+  Future<void> _loadData() async {
     setState(() => _isLoading = true);
     
-    // Simulate API call for now since backend is still being built
-    await Future.delayed(const Duration(seconds: 1));
+    final results = await Future.wait([
+      _apiService.getFriends(),
+      _apiService.getPendingInvites(),
+    ]);
     
-    // Mock Data (Removed for clean state)
-    final mockFriends = [];
-
-    setState(() {
-      _friends = mockFriends;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _friends = results[0];
+        _pendingCount = (results[1] as List).length;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -47,20 +50,49 @@ class _FriendsScreenState extends State<FriendsScreen> {
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none), // Badge removed since there are no invites
-            onPressed: () {
-              Navigator.push(
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications_none),
+                if (_pendingCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
+                      child: Text(
+                        '$_pendingCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const InvitesScreen()),
               );
+              _loadData(); // Refresh when coming back
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: Column(
+                children: [
                 _buildAddFriendHeader(),
                 Expanded(
                   child: _friends.isEmpty
@@ -120,7 +152,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
   }
 
+  bool _isOnline(String? lastSeenStr) {
+    if (lastSeenStr == null) return false;
+    final lastSeen = DateTime.parse(lastSeenStr);
+    return DateTime.now().difference(lastSeen).inMinutes < 5;
+  }
+
   Widget _buildFriendCard(dynamic friend) {
+    final bool online = _isOnline(friend['last_seen']);
+    final String name = friend['name'] ?? 'Unknown';
+    final String? avatar = friend['avatar'];
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -142,9 +184,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: Colors.deepPurple.shade100,
-                child: Text(friend['name'][0].toUpperCase()),
+                backgroundImage: avatar != null && avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                child: avatar == null || avatar.isEmpty 
+                    ? Text(name[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold))
+                    : null,
               ),
-              if (friend['online'])
+              if (online)
                 Positioned(
                   right: 0,
                   bottom: 0,
