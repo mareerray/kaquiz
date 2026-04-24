@@ -212,12 +212,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  friend['name'],
+                  name,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
-                  friend['email'],
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  online ? 'Online' : 'Offline',
+                  style: TextStyle(color: online ? Colors.green : Colors.grey.shade600, fontSize: 13),
                 ),
               ],
             ),
