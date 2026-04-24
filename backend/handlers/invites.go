@@ -159,10 +159,11 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
     // Step 4: Add to friends table
     _, err = db.DB.Exec(context.Background(),
-        `INSERT INTO friends (user_id, friend_id) VALUES ($1, $2)
+        `INSERT INTO friends (user_id, friend_id) VALUES ($1, $2), ($2, $1)
          ON CONFLICT (user_id, friend_id) DO NOTHING`, // prevent duplicates
         userID, senderID,
     )
+
     if err != nil {
         fmt.Println("❌ Failed to add friend:", err)
         http.Error(w, "Failed to accept invite", http.StatusInternalServerError)
