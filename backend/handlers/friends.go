@@ -6,6 +6,7 @@ import (
     "fmt"
     "net/http"
     "strconv"
+	"time"
 
     "kaquiz-backend/db"
     "kaquiz-backend/middleware"
@@ -38,7 +39,7 @@ func GetFriends(w http.ResponseWriter, r *http.Request) {
         var id int
         var name, avatar string
         var lat, lng *float64
-        var lastSeen *string
+        var lastSeen *time.Time
 
         err := rows.Scan(&id, &name, &avatar, &lat, &lng, &lastSeen)
         if err != nil {
@@ -46,13 +47,18 @@ func GetFriends(w http.ResponseWriter, r *http.Request) {
             continue
         }
 
+		var lastSeenStr *string
+		if lastSeen != nil {
+			s := lastSeen.Format("2006-01-02 15:04:05")
+			lastSeenStr = &s
+		}
         friends = append(friends, map[string]interface{}{
             "id":        id,
             "name":      name,
             "avatar":    avatar,
             "lat":       lat,
             "lng":       lng,
-            "last_seen": lastSeen,
+            "last_seen": lastSeenStr,
         })
     }
 
