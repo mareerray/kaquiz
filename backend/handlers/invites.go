@@ -51,7 +51,8 @@ func SendInvite(w http.ResponseWriter, r *http.Request) {
 
     // Step 5: Insert the new invite (no status needed!)
     _, err = db.DB.Exec(context.Background(),
-        `INSERT INTO invites (sender_id, recipient_id) VALUES ($1, $2)`,
+        `INSERT INTO invites (sender_id, recipient_id) VALUES ($1, $2)
+         ON CONFLICT (sender_id, recipient_id) DO NOTHING`, // prevent duplicates
         senderID, receiverID,
     )
     if err != nil {
@@ -159,7 +160,8 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
     // Step 4: Add to friends table
     _, err = db.DB.Exec(context.Background(),
-        `INSERT INTO friends (user_id, friend_id) VALUES ($1, $2)`,
+        `INSERT INTO friends (user_id, friend_id) VALUES ($1, $2)
+         ON CONFLICT (user_id, friend_id) DO NOTHING`, // prevent duplicates
         userID, senderID,
     )
     if err != nil {
