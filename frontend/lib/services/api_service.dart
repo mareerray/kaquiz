@@ -56,9 +56,21 @@ class ApiService {
   // --- SOCIAL METHODS (WEEK 2) ---
 
   Future<List<dynamic>> getFriends() async {
-    // Note: Backend /api/friends is not yet ready (empty handler)
-    await Future.delayed(const Duration(milliseconds: 500));
-    return [];
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/friends'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_session.token}',
+        },
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<List<dynamic>> getPendingInvites() async {
@@ -125,6 +137,25 @@ class ApiService {
     }
   }
 
+  Future<bool> updateUserProfile(String name, String avatar) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/users'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_session.token}',
+        },
+        body: jsonEncode({
+          'name': name,
+          'avatar': avatar,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // --- LOCATION METHODS ---
 
   Future<bool> updateUserLocation(double lat, double lng) async {
@@ -147,33 +178,21 @@ class ApiService {
   }
 
   Future<List<dynamic>> getFriendsLocations(double myLat, double myLng) async {
-    // Mocking for Day 7 until GET /friends/locations is ready
-    await Future.delayed(const Duration(milliseconds: 500));
-    return [
-      {
-        'id': 101,
-        'name': 'Maire',
-        'latitude': myLat + 0.005,
-        'longitude': myLng + 0.005,
-        'avatar_url': 'https://i.pravatar.cc/150?u=maire',
-        'last_seen_at': DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
-      },
-      {
-        'id': 102,
-        'name': 'Oleksii',
-        'latitude': myLat - 0.008,
-        'longitude': myLng + 0.003,
-        'avatar_url': null,
-        'last_seen_at': DateTime.now().subtract(const Duration(minutes: 12)).toIso8601String(),
-      },
-      {
-        'id': 103,
-        'name': 'Kateryna (Twin)',
-        'latitude': myLat + 0.002,
-        'longitude': myLng - 0.007,
-        'avatar_url': 'https://i.pravatar.cc/150?u=kat',
-        'last_seen_at': DateTime.now().subtract(const Duration(seconds: 45)).toIso8601String(),
-      },
-    ];
+    // Now calling the real GET /api/friends which returns locations
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/friends'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_session.token}',
+        },
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 }

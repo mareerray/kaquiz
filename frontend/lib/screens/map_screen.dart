@@ -95,13 +95,16 @@ class _MapScreenState extends State<MapScreen> {
     final Set<Marker> newMarkers = {};
 
     for (var friend in friendsData) {
-      final String name = friend['name'];
-      final double lat = friend['latitude'];
-      final double lng = friend['longitude'];
-      final String? avatarUrl = friend['avatar_url'];
-      final DateTime lastSeen = DateTime.parse(friend['last_seen_at']);
+      final String name = friend['name'] ?? 'Unknown';
+      final double? lat = friend['lat'] != null ? (friend['lat'] as num).toDouble() : null;
+      final double? lng = friend['lng'] != null ? (friend['lng'] as num).toDouble() : null;
+      final String? avatarUrl = friend['avatar'];
+      final DateTime? lastSeen = friend['last_seen'] != null ? DateTime.parse(friend['last_seen']) : null;
       
-      final String status = _formatLastSeen(lastSeen);
+      // Only show marker if location is available
+      if (lat == null || lng == null) continue;
+
+      final String status = lastSeen != null ? _formatLastSeen(lastSeen) : 'Never seen';
 
       // Generate custom circular marker icon
       final icon = await MarkerUtils.getAvatarMarker(
@@ -189,18 +192,6 @@ class _MapScreenState extends State<MapScreen> {
                   onPressed: _goToCurrentPosition,
                   heroTag: 'center_me',
                 ),
-                const SizedBox(height: 12),
-                _buildMapActionButton(
-                  icon: Icons.people,
-                  onPressed: () {
-                     // Nav to friends list
-                     Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => FriendsScreen()),
-                      );
-                  },
-                  heroTag: 'friends_list',
-                ),
               ],
             ),
           ),
@@ -236,26 +227,13 @@ class _MapScreenState extends State<MapScreen> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => SearchScreen()),
+                    MaterialPageRoute(builder: (context) => const SearchScreen()),
                   );
                 },
                 child: const Text(
                   'Search friends...',
                   style: TextStyle(color: Colors.black45, fontSize: 16),
                 ),
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ProfileScreen()),
-                );
-              },
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.grey.shade200,
-                child: const Icon(Icons.person, color: Colors.black54),
               ),
             ),
           ],

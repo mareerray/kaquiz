@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
-import 'map_screen.dart';
+import '../main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,10 +39,10 @@ class _LoginScreenState extends State<LoginScreen> {
           // Save to session
           _session.setToken(jwtToken);
 
-          // Nav to Map Screen (replace to prevent going back to login via back button)
+          // Nav to Main Navigation (replaces the whole stack)
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => MapScreen()),
+            MaterialPageRoute(builder: (context) => const MainNavigation()),
           );
         }
       } else {
