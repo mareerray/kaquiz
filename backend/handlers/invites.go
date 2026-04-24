@@ -51,8 +51,7 @@ func SendInvite(w http.ResponseWriter, r *http.Request) {
 
     // Step 5: Insert the new invite (no status needed!)
     _, err = db.DB.Exec(context.Background(),
-        `INSERT INTO invites (sender_id, recipient_id) VALUES ($1, $2)
-         ON CONFLICT (sender_id, recipient_id) DO NOTHING`, // prevent duplicates
+        `INSERT INTO invites (sender_id, recipient_id) VALUES ($1, $2)`, // prevent duplicates
         senderID, receiverID,
     )
     if err != nil {
