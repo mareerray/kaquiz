@@ -37,6 +37,8 @@ func main() {
 	protected.HandleFunc("/locations", handlers.UpdateLocation).Methods("POST")
 	protected.HandleFunc("/invites/{user_id}", handlers.SendInvite).Methods("POST") // invites + receipeint ID in URL
 	protected.HandleFunc("/invites", handlers.GetInvites).Methods("GET")
+	protected.HandleFunc("/api/invites/{id}/accept", middleware.Auth(handlers.AcceptInvite)).Methods("POST")
+	protected.HandleFunc("/api/invites/{id}/decline", middleware.Auth(handlers.DeclineInvite)).Methods("POST")
 
 	// Start server
 	// ✅ After
