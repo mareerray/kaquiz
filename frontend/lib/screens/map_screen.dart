@@ -37,8 +37,8 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _initializeLocation();
     
-    // Day 7: Start polling for friends' locations every 30 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Day 7: Start polling for friends' locations every 10 seconds (increased from 30s for responsiveness)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (_currentPosition != null) {
         _updateFriendsMarkers();
       }
