@@ -39,6 +39,9 @@ func main() {
 	protected.HandleFunc("/invites", handlers.GetInvites).Methods("GET")
 	protected.HandleFunc("/invites/{id}/accept", (handlers.AcceptInvite)).Methods("POST")
 	protected.HandleFunc("/invites/{id}/decline", (handlers.DeclineInvite)).Methods("POST")
+	protected.HandleFunc("/friends", handlers.GetFriends).Methods("GET")
+	protected.HandleFunc("/friends/{id}", handlers.DeleteFriend).Methods("DELETE")
+
 
 	// Start server
 	// ✅ After
