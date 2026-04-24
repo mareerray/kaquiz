@@ -162,21 +162,32 @@ class _SearchScreenState extends State<SearchScreen> {
           // Add Friend Button
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                // UI Mockup for invite
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Friend request sent! (Mock)')),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: const Text('Add Friend'),
-            ),
+            child: _isSearching 
+              ? const Center(child: CircularProgressIndicator())
+              : ElevatedButton(
+                  onPressed: () async {
+                    if (user['id'] == null) return;
+                    
+                    final success = await _apiService.sendFriendRequest(user['id']);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(success 
+                            ? 'Friend request sent to ${user['name']}! 📨' 
+                            : 'Failed to send request. Maybe already sent?'),
+                          backgroundColor: success ? Colors.green : Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Add Friend'),
+                ),
           ),
         ],
       ),

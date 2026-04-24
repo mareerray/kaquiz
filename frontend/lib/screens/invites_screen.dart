@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class InvitesScreen extends StatefulWidget {
   const InvitesScreen({super.key});
@@ -8,19 +9,50 @@ class InvitesScreen extends StatefulWidget {
 }
 
 class _InvitesScreenState extends State<InvitesScreen> {
-  bool _isLoading = false;
-  
-  // Mock Invites List (Cleared)
-  List<Map<String, dynamic>> _invites = [];
+  final ApiService _apiService = ApiService();
+  bool _isLoading = true;
+  List<dynamic> _invites = [];
 
-  void _handleAction(int id, bool accept) {
-    setState(() {
-      _invites.removeWhere((invite) => invite['id'] == id);
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadInvites();
+  }
+
+  Future<void> _loadInvites() async {
+    setState(() => _isLoading = true);
+    final invites = await _apiService.getPendingInvites();
+    if (mounted) {
+      setState(() {
+        _invites = invites;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _handleAction(int id, bool accept) async {
+    setState(() => _isLoading = true);
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(accept ? 'Accepted! 🤝' : 'Declined.')),
-    );
+    final success = await _apiService.respondToInvite(id, accept);
+    
+    if (mounted) {
+      if (success) {
+        setState(() {
+          _invites.removeWhere((invite) => invite['id'] == id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(accept ? 'Accepted! 🤝' : 'Declined.'),
+            backgroundColor: accept ? Colors.green : Colors.orange,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to process request.'), backgroundColor: Colors.redAccent),
+        );
+      }
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -32,20 +64,28 @@ class _InvitesScreenState extends State<InvitesScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadInvites,
+          ),
+        ],
       ),
-      body: _invites.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _invites.length,
-              itemBuilder: (context, index) {
-                return _buildInviteCard(_invites[index]);
-              },
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _invites.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: _invites.length,
+                  itemBuilder: (context, index) {
+                    return _buildInviteCard(_invites[index]);
+                  },
+                ),
     );
   }
 
-  Widget _buildInviteCard(Map<String, dynamic> invite) {
+  Widget _buildInviteCard(dynamic invite) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -67,7 +107,10 @@ class _InvitesScreenState extends State<InvitesScreen> {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: Colors.orange.shade100,
-                child: Text(invite['name'][0].toUpperCase(), style: const TextStyle(color: Colors.orange)),
+                child: Text(
+                  invite['name']?[0]?.toUpperCase() ?? '?',
+                  style: const TextStyle(color: Colors.orange),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -75,11 +118,11 @@ class _InvitesScreenState extends State<InvitesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      invite['name'],
+                      invite['name'] ?? 'Unknown',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     Text(
-                      invite['email'],
+                      'Requested on ${invite['created_at']?.split(' ')[0] ?? ''}',
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                     ),
                   ],

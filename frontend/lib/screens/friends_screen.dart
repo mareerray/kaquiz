@@ -182,9 +182,48 @@ class _FriendsScreenState extends State<FriendsScreen> {
               // Future: show this friend on map
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            onPressed: () => _confirmDelete(friend),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(dynamic friend) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Friend?'),
+        content: Text('Are you sure you want to remove ${friend['name']} from your friends list?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // Optimistic UI update
+      setState(() {
+        _friends.removeWhere((f) => f['id'] == friend['id'] || f['email'] == friend['email']);
+      });
+
+      final success = await _apiService.deleteFriend(friend['id'] ?? 0);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? '${friend['name']} removed.' : 'Failed to remove from server.'),
+            backgroundColor: success ? Colors.black87 : Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildEmptyState() {

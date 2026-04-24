@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/location_service.dart';
 import '../services/api_service.dart';
+import '../utils/marker_utils.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
 import 'friends_screen.dart';
@@ -22,6 +23,9 @@ class _MapScreenState extends State<MapScreen> {
   
   LatLng? _currentPosition;
   bool _isMapLoading = true;
+  Set<Marker> _friendsMarkers = {};
+  Timer? _refreshTimer;
+  Timer? _locationUpdateTimer;
 
   static const CameraPosition _kInitialPosition = CameraPosition(
     target: LatLng(50.4501, 30.5234), // Kyiv as default fallback
@@ -32,11 +36,37 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _initializeLocation();
+    
+    // Day 7: Start polling for friends' locations every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_currentPosition != null) {
+        _updateFriendsMarkers();
+      }
+    });
+
+    // Day 12: Start sending OWN location to server every 10 seconds
+    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+       if (_currentPosition != null) {
+          final newLocation = await _locationService.getCurrentLocation();
+          if (newLocation != null) {
+             setState(() => _currentPosition = newLocation);
+             _apiService.updateUserLocation(newLocation.latitude, newLocation.longitude);
+          }
+       }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _locationUpdateTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializeLocation() async {
     final location = await _locationService.getCurrentLocation();
     if (location != null) {
+      if (!mounted) return;
       setState(() {
         _currentPosition = location;
         _isMapLoading = false;
@@ -45,9 +75,66 @@ class _MapScreenState extends State<MapScreen> {
       
       // Send initial location to backend
       _apiService.updateUserLocation(location.latitude, location.longitude);
+      
+      // Day 7: Initial pull of friends
+      _updateFriendsMarkers();
     } else {
+      if (!mounted) return;
       setState(() => _isMapLoading = false);
     }
+  }
+
+  Future<void> _updateFriendsMarkers() async {
+    if (_currentPosition == null) return;
+
+    final friendsData = await _apiService.getFriendsLocations(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+    );
+
+    final Set<Marker> newMarkers = {};
+
+    for (var friend in friendsData) {
+      final String name = friend['name'];
+      final double lat = friend['latitude'];
+      final double lng = friend['longitude'];
+      final String? avatarUrl = friend['avatar_url'];
+      final DateTime lastSeen = DateTime.parse(friend['last_seen_at']);
+      
+      final String status = _formatLastSeen(lastSeen);
+
+      // Generate custom circular marker icon
+      final icon = await MarkerUtils.getAvatarMarker(
+        url: avatarUrl,
+        name: name,
+        color: Colors.deepPurple,
+      );
+
+      newMarkers.add(
+        Marker(
+          markerId: MarkerId('friend_${friend['id']}'),
+          position: LatLng(lat, lng),
+          icon: icon,
+          infoWindow: InfoWindow(
+            title: name,
+            snippet: status,
+          ),
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _friendsMarkers = newMarkers;
+    });
+  }
+
+  String _formatLastSeen(DateTime lastSeen) {
+    final diff = DateTime.now().difference(lastSeen);
+    if (diff.inMinutes < 1) return 'Active just now';
+    if (diff.inMinutes < 60) return 'Active ${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return 'Active ${diff.inHours}h ago';
+    return 'Active yesterday';
   }
 
   Future<void> _goToCurrentPosition() async {
@@ -75,6 +162,7 @@ class _MapScreenState extends State<MapScreen> {
             myLocationEnabled: true,
             myLocationButtonEnabled: false, // Custom button instead
             zoomControlsEnabled: false,
+            markers: _friendsMarkers, // Day 7: Friend avatars
             onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
             },
