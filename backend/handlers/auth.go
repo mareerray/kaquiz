@@ -66,14 +66,22 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	err = db.DB.QueryRow(context.Background(),
 		`INSERT INTO users (email, name, avatar)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+		ON CONFLICT (email) DO NOTHING 
 		RETURNING id`,
 		email, name, avatar,
 	).Scan(&userID)
+	
+	// If user already exists, fetch their id manually
 	if err != nil {
-		fmt.Println("❌ DB Error:", err)  // ← add this
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return	
+		err = db.DB.QueryRow(context.Background(),
+			`SELECT id FROM users WHERE email = $1`,
+			email,
+		).Scan(&userID)
+		if err != nil {
+			fmt.Println("❌ DB Error fetching existing user:", err)
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// 5. Create JWT token
