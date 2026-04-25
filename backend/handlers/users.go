@@ -30,15 +30,19 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
     var id int
     var name, avatar, email string
 
-    err := db.DB.QueryRow(context.Background(),
-        `UPDATE users 
-			SET name = $1, avatar = $2 
-			WHERE id = $3
-			RETURNING id, name, avatar, email`,
-        req.Name, req.Avatar, userID,
-    ).Scan(&id, &name, &avatar, &email)
-
-    if err != nil {
+    // Only update avatar if it was provided
+    var err error
+	err = db.DB.QueryRow(context.Background(),
+		`UPDATE users 
+		SET 
+		name   = CASE WHEN $1 = '' THEN name ELSE $1 END,
+		avatar = CASE WHEN $2 = '' THEN avatar ELSE $2 END
+		WHERE id = $3
+		RETURNING id, name, avatar, email`,
+		req.Name, req.Avatar, userID,
+	).Scan(&id, &name, &avatar, &email)
+	
+	if err != nil {
         fmt.Println("❌ Failed to update user:", err)
         http.Error(w, "Failed to update user", http.StatusInternalServerError)
         return
