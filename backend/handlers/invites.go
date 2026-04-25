@@ -132,8 +132,12 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
 // -------------- ACCEPT INVITES ------------------
 func AcceptInvite(w http.ResponseWriter, r *http.Request) {
     // Step 1: Who is accepting? (the recipient)
-    userIDStr := r.Context().Value(middleware.UserIDKey).(string)
-    userID, _ := strconv.Atoi(userIDStr)
+    recipientIDStr := r.Context().Value(middleware.UserIDKey).(string)
+    recipientID, err := strconv.Atoi(recipientIDStr)
+    if err != nil {
+        http.Error(w, "Invalid user ID", http.StatusBadRequest)
+        return
+    }
 
     // Step 2: Which invite?
     vars := mux.Vars(r)
@@ -143,13 +147,13 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("✅ Accepting invite:", inviteID, "by user:", userID)
+    fmt.Println("✅ Accepting invite:", inviteID, "by user:", recipientID)
 
     // Step 3: Find the sender of the invite
     var senderID int
     err = db.DB.QueryRow(context.Background(),
         `SELECT sender_id FROM invites WHERE id = $1 AND recipient_id = $2`,
-        inviteID, userID,
+        inviteID, recipientID,
     ).Scan(&senderID)
     if err != nil {
         fmt.Println("❌ Invite not found or not yours:", err)
@@ -157,10 +161,10 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("🔍 Inserting friendship: userID =", userID, "senderID =", senderID)
+    fmt.Println("🔍 Inserting friendship: recipientID =", recipientID, "senderID =", senderID)
 
     // makes sure friendship is always stored like (smallerID, biggerID), never randomly.
-    a := userID
+    a := recipientID
     b := senderID
 
     if a > b {
@@ -184,17 +188,18 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
     // Step 5: Delete BOTH invite rows between these two users
     _, err = db.DB.Exec(context.Background(),
         `DELETE FROM invites
-        WHERE (sender_id = $1 AND receiver_id = $2)
-            OR (sender_id = $2 AND receiver_id = $1)`,
-        senderID, userID,
+        WHERE (sender_id = $1 AND recipient_id = $2)
+            OR (sender_id = $2 AND recipient_id = $1)`,
+        senderID, recipientID,
     )
 
     if err != nil {
         fmt.Println("❌ Failed to delete invite:", err)
         http.Error(w, "Friend added but failed to clean invites", http.StatusInternalServerError)
+        return
     }
 
-    fmt.Println("🎉 Friendship created:", userID, "↔", senderID)
+    fmt.Println("🎉 Friendship created:", recipientID, "↔", senderID)
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]string{
@@ -202,11 +207,89 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
     })
 }
 
+// func AcceptInvite(w http.ResponseWriter, r *http.Request) {
+//     ctx := r.Context()
+
+//     recipientIDStr, ok := r.Context().Value(middleware.UserIDKey).(string)
+//     if !ok {
+//         http.Error(w, "Unauthorized", http.StatusUnauthorized)
+//         return
+//     }
+
+//     recipientID, err := strconv.Atoi(recipientIDStr)
+//     if err != nil {
+//         http.Error(w, "Invalid user ID", http.StatusBadRequest)
+//         return
+//     }
+
+//     inviteID, err := strconv.Atoi(mux.Vars(r)["id"])
+//     if err != nil {
+//         http.Error(w, "Invalid invite ID", http.StatusBadRequest)
+//         return
+//     }
+
+//     tx, err := db.DB.Begin(ctx)
+//     if err != nil {
+//         http.Error(w, "Database error", http.StatusInternalServerError)
+//         return
+//     }
+//     defer tx.Rollback(ctx)
+
+//     var senderID int
+//     err = tx.QueryRow(ctx,
+//         `SELECT sender_id
+//          FROM invites
+//          WHERE id = $1 AND recipient_id = $2`,
+//         inviteID, recipientID,
+//     ).Scan(&senderID)
+//     if err != nil {
+//         http.Error(w, "Invite not found", http.StatusNotFound)
+//         return
+//     }
+
+//     a, b := recipientID, senderID
+//     if a > b {
+//         a, b = b, a
+//     }
+
+//     _, err = tx.Exec(ctx,
+//         `INSERT INTO friends (user_id, friend_id)
+//          VALUES ($1, $2)
+//          ON CONFLICT (user_id, friend_id) DO NOTHING`,
+//         a, b,
+//     )
+//     if err != nil {
+//         http.Error(w, "Failed to accept invite", http.StatusInternalServerError)
+//         return
+//     }
+
+//     _, err = tx.Exec(ctx,
+//         `DELETE FROM invites
+//          WHERE (sender_id = $1 AND recipient_id = $2)
+//             OR (sender_id = $2 AND recipient_id = $1)`,
+//         senderID, recipientID,
+//     )
+//     if err != nil {
+//         http.Error(w, "Failed to clean invites", http.StatusInternalServerError)
+//         return
+//     }
+
+//     if err = tx.Commit(ctx); err != nil {
+//         http.Error(w, "Database commit failed", http.StatusInternalServerError)
+//         return
+//     }
+
+//     w.Header().Set("Content-Type", "application/json")
+//     json.NewEncoder(w).Encode(map[string]string{
+//         "message": "Friend added successfully",
+//     })
+// }
+
 // -------------- DECLINE INVITES ------------------
 func DeclineInvite(w http.ResponseWriter, r *http.Request) {
     // Step 1: Who is declining?
-    userIDStr := r.Context().Value(middleware.UserIDKey).(string)
-    userID, _ := strconv.Atoi(userIDStr)
+    recipientIDStr := r.Context().Value(middleware.UserIDKey).(string)
+    recipientID, _ := strconv.Atoi(recipientIDStr)
 
     // Step 2: Which invite?
     vars := mux.Vars(r)
@@ -216,12 +299,12 @@ func DeclineInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("❌ Declining invite:", inviteID, "by user:", userID)
+    fmt.Println("❌ Declining invite:", inviteID, "by user:", recipientID)
 
     // Step 3: Delete the invite (only if it belongs to this user)
     result, err := db.DB.Exec(context.Background(),
         `DELETE FROM invites WHERE id = $1 AND recipient_id = $2`,
-        inviteID, userID,
+        inviteID, recipientID,
     )
     if err != nil || result.RowsAffected() == 0 {
         http.Error(w, "Invite not found", http.StatusNotFound)
