@@ -26,20 +26,33 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update user in database
-	_, err := db.DB.Exec(context.Background(),
-		`UPDATE users SET name = $1, avatar = $2 WHERE id = $3`,
-		req.Name, req.Avatar, userID,
-	)
-	if err != nil {
-		http.Error(w, "Failed to update user", http.StatusInternalServerError)
-		return
-	}
+	// Update AND return the updated user in one query
+    var id int
+    var name, avatar, email string
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "User updated successfully",
-	})
+    err := db.DB.QueryRow(context.Background(),
+        `UPDATE users 
+			SET name = $1, avatar = $2 
+			WHERE id = $3
+			RETURNING id, name, avatar, email`,
+        req.Name, req.Avatar, userID,
+    ).Scan(&id, &name, &avatar, &email)
+
+    if err != nil {
+        fmt.Println("❌ Failed to update user:", err)
+        http.Error(w, "Failed to update user", http.StatusInternalServerError)
+        return
+    }
+
+    fmt.Println("✅ User updated:", name)
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "id":     id,
+        "name":   name,
+        "avatar": avatar,
+        "email":  email,
+    })
 }
 
 func SearchUsers(w http.ResponseWriter, r *http.Request) {
