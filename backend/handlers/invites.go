@@ -145,41 +145,25 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
     fmt.Println("✅ Accepting invite:", inviteID, "by user:", userID)
 
-    // Step 3: Find the invite and verify it belongs to this user
+    // Step 3: Find the sender of the invite
     var senderID int
-    // err = db.DB.QueryRow(context.Background(),
-    //     `SELECT sender_id FROM invites WHERE id = $1 AND recipient_id = $2`,
-    //     inviteID, userID,
-    // ).Scan(&senderID)
-
-    query := `
-    INSERT INTO friends (user_id, friend_id)
-    VALUES ($1, $2)
-    ON CONFLICT (user_id, friend_id) DO NOTHING
-    `
-
-    fmt.Println("RUNNING SQL:")
-    fmt.Println(query)
-    fmt.Println("VALUES:", userID, senderID)
-
-    _, err = db.DB.Exec(context.Background(), query, userID, senderID)
-    if err != nil {
-        fmt.Println("❌ Failed to add friend:", err)
-        http.Error(w, "Failed to accept invite", http.StatusInternalServerError)
-        return
-    }
-
+    err = db.DB.QueryRow(context.Background(),
+        `SELECT sender_id FROM invites WHERE id = $1 AND recipient_id = $2`,
+        inviteID, userID,
+    ).Scan(&senderID)
     if err != nil {
         fmt.Println("❌ Invite not found or not yours:", err)
         http.Error(w, "Invite not found", http.StatusNotFound)
         return
     }
 
+    fmt.Println("🔍 Inserting friendship: userID =", userID, "senderID =", senderID)
+
     // Step 4: Add to friends table
     _, err = db.DB.Exec(context.Background(),
         `INSERT INTO friends (user_id, friend_id) 
-        VALUES ($1, $2)
-        ON CONFLICT (user_id, friend_id) DO NOTHING`, // prevent duplicates
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, friend_id) DO NOTHING`, // prevent duplicates
         userID, senderID,
     )
 
@@ -189,7 +173,19 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Step 5: Delete the invite
+    // Step 5: Add reverse friendship
+    _, err = db.DB.Exec(context.Background(),
+        `INSERT INTO friends (user_id, friend_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, friend_id) DO NOTHING`,
+        senderID, userID,
+    )
+    if err != nil {
+        fmt.Println("❌ Failed to add reverse friend:", err)
+        http.Error(w, "Failed to accept invite", http.StatusInternalServerError)
+        return
+    }
+    // Step 6: Delete the invite
     _, err = db.DB.Exec(context.Background(),
         `DELETE FROM invites WHERE id = $1`,
         inviteID,

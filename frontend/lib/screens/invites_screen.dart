@@ -107,11 +107,24 @@ class _InvitesScreenState extends State<InvitesScreen> {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: Colors.orange.shade100,
-                child: Text(
-                  invite['name']?[0]?.toUpperCase() ?? '?',
-                  style: const TextStyle(color: Colors.orange),
-                ),
+                backgroundImage: (invite['avatar'] != null && invite['avatar'].toString().isNotEmpty)
+                    ? NetworkImage(invite['avatar'])
+                    : null,
+                child: (invite['avatar'] == null || invite['avatar'].toString().isEmpty)
+                    ? Text(
+                        invite['name']?[0]?.toUpperCase() ?? '?',
+                        style: const TextStyle(color: Colors.orange),
+                      )
+                    : null,
               ),
+              // CircleAvatar(
+              //   radius: 24,
+              //   backgroundColor: Colors.orange.shade100,
+              //   child: Text(
+              //     invite['name']?[0]?.toUpperCase() ?? '?',
+              //     style: const TextStyle(color: Colors.orange),
+              //   ),
+              // ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
