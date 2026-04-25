@@ -23,8 +23,11 @@ func GetFriends(w http.ResponseWriter, r *http.Request) {
     rows, err := db.DB.Query(context.Background(),
         `SELECT u.id, u.name, u.avatar, u.lat, u.lng, u.last_seen
             FROM friends f
-            JOIN users u ON u.id = f.friend_id
-            WHERE f.user_id = $1`,
+            JOIN users u ON u.id = CASE 
+                WHEN f.user_id = $1 THEN f.friend_id 
+                ELSE f.user_id 
+            END
+            WHERE f.user_id = $1 OR f.friend_id = $1`,
         userID,
     )
     if err != nil {
@@ -86,7 +89,9 @@ func DeleteFriend(w http.ResponseWriter, r *http.Request) {
     fmt.Println("🗑️ Removing friend:", friendID, "for user:", userID)
 
     result, err := db.DB.Exec(context.Background(),
-        `DELETE FROM friends WHERE user_id = $1 AND friend_id = $2`,
+        `DELETE FROM friends 
+            WHERE (user_id = $1 AND friend_id = $2)
+            OR (user_id = $2 AND friend_id = $1)`,
         userID, friendID,
     )
     if err != nil || result.RowsAffected() == 0 {
