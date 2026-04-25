@@ -159,12 +159,20 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
     fmt.Println("🔍 Inserting friendship: userID =", userID, "senderID =", senderID)
 
+    // makes sure friendship is always stored like (smallerID, biggerID), never randomly.
+    a := userID
+    b := senderID
+
+    if a > b {
+        a, b = b, a
+    }
+
     // Step 4: Add to friends table
     _, err = db.DB.Exec(context.Background(),
         `INSERT INTO friends (user_id, friend_id) 
             VALUES ($1, $2)
             ON CONFLICT (user_id, friend_id) DO NOTHING`, // prevent duplicates
-        userID, senderID,
+        a, b,
     )
 
     if err != nil {
@@ -173,13 +181,17 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Step 5: Delete the invite
+    // Step 5: Delete BOTH invite rows between these two users
     _, err = db.DB.Exec(context.Background(),
-        `DELETE FROM invites WHERE id = $1`,
-        inviteID,
+        `DELETE FROM invites
+        WHERE (sender_id = $1 AND receiver_id = $2)
+            OR (sender_id = $2 AND receiver_id = $1)`,
+        senderID, userID,
     )
+
     if err != nil {
         fmt.Println("❌ Failed to delete invite:", err)
+        http.Error(w, "Friend added but failed to clean invites", http.StatusInternalServerError)
     }
 
     fmt.Println("🎉 Friendship created:", userID, "↔", senderID)
