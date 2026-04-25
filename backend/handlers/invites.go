@@ -173,19 +173,7 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Step 5: Add reverse friendship
-    _, err = db.DB.Exec(context.Background(),
-        `INSERT INTO friends (user_id, friend_id)
-            VALUES ($1, $2)
-            ON CONFLICT (user_id, friend_id) DO NOTHING`,
-        senderID, userID,
-    )
-    if err != nil {
-        fmt.Println("❌ Failed to add reverse friend:", err)
-        http.Error(w, "Failed to accept invite", http.StatusInternalServerError)
-        return
-    }
-    // Step 6: Delete the invite
+    // Step 5: Delete the invite
     _, err = db.DB.Exec(context.Background(),
         `DELETE FROM invites WHERE id = $1`,
         inviteID,
