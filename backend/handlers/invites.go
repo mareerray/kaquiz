@@ -51,7 +51,8 @@ func SendInvite(w http.ResponseWriter, r *http.Request) {
 
     // Step 5: Insert the new invite (no status needed!)
     _, err = db.DB.Exec(context.Background(),
-        `INSERT INTO invites (sender_id, recipient_id) VALUES ($1, $2)`, // prevent duplicates
+        `INSERT INTO invites (sender_id, recipient_id) 
+         VALUES ($1, $2)`, // prevent duplicates
         senderID, receiverID,
     )
     if err != nil {
@@ -146,10 +147,27 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
     // Step 3: Find the invite and verify it belongs to this user
     var senderID int
-    err = db.DB.QueryRow(context.Background(),
-        `SELECT sender_id FROM invites WHERE id = $1 AND recipient_id = $2`,
-        inviteID, userID,
-    ).Scan(&senderID)
+    // err = db.DB.QueryRow(context.Background(),
+    //     `SELECT sender_id FROM invites WHERE id = $1 AND recipient_id = $2`,
+    //     inviteID, userID,
+    // ).Scan(&senderID)
+
+    query := `
+    INSERT INTO friends (user_id, friend_id)
+    VALUES ($1, $2)
+    ON CONFLICT (user_id, friend_id) DO NOTHING
+    `
+
+    fmt.Println("RUNNING SQL:")
+    fmt.Println(query)
+    fmt.Println("VALUES:", userID, senderID)
+
+    _, err = db.DB.Exec(context.Background(), query, userID, senderID)
+    if err != nil {
+        fmt.Println("❌ Failed to add friend:", err)
+        http.Error(w, "Failed to accept invite", http.StatusInternalServerError)
+        return
+    }
 
     if err != nil {
         fmt.Println("❌ Invite not found or not yours:", err)
@@ -159,8 +177,9 @@ func AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
     // Step 4: Add to friends table
     _, err = db.DB.Exec(context.Background(),
-        `INSERT INTO friends (user_id, friend_id) VALUES ($1, $2),
-         ON CONFLICT (user_id, friend_id) DO NOTHING`, // prevent duplicates
+        `INSERT INTO friends (user_id, friend_id) 
+        VALUES ($1, $2)
+        ON CONFLICT (user_id, friend_id) DO NOTHING`, // prevent duplicates
         userID, senderID,
     )
 
