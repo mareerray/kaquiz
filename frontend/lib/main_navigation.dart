@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'screens/map_screen.dart';
 import 'screens/friends_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/invites_screen.dart';
+import 'services/api_service.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -12,17 +15,54 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  final ApiService _apiService = ApiService();
   int _selectedIndex = 0;
+  int _pendingInvitesCount = 0;
+  Timer? _badgeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInvites();
+    // Poll for new invites every 20 seconds
+    _badgeTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
+      _checkInvites();
+    });
+  }
+
+  @override
+  void dispose() {
+    _badgeTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkInvites() async {
+    try {
+      final invites = await _apiService.getPendingInvites();
+      if (mounted) {
+        setState(() {
+          _pendingInvitesCount = invites.length;
+        });
+      }
+    } catch (e) {
+      // Silently fail, it's just a badge
+    }
+  }
 
   final List<Widget> _screens = [
     const MapScreen(),
     const FriendsScreen(),
+    const InvitesScreen(),
     const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      if (index == 2) {
+        // If they click Invites, we can assume they saw them for a bit, 
+        // but we'll let the next poll clear it properly if they accept/decline.
+      }
     });
   }
 
@@ -35,8 +75,8 @@ class _MainNavigationState extends State<MainNavigation> {
         children: _screens,
       ),
       bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(24, 0, 24, 30),
-        height: 70, // Fixed height for perfect centering
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 30),
+        height: 75,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(35),
           boxShadow: [
@@ -58,7 +98,8 @@ class _MainNavigationState extends State<MainNavigation> {
                 children: [
                   _buildNavItem(Icons.map_outlined, Icons.map, 'Map', 0),
                   _buildNavItem(Icons.people_outline, Icons.people, 'Friends', 1),
-                  _buildNavItem(Icons.person_outline, Icons.person, 'Profile', 2),
+                  _buildNavItem(Icons.mail_outline, Icons.mail, 'Invites', 2, hasBadge: _pendingInvitesCount > 0),
+                  _buildNavItem(Icons.person_outline, Icons.person, 'Profile', 3),
                 ],
               ),
             ),
@@ -68,7 +109,7 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index) {
+  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, {bool hasBadge = false}) {
     final isSelected = _selectedIndex == index;
     final color = isSelected ? Colors.deepPurple : Colors.grey.shade600;
 
@@ -78,13 +119,35 @@ class _MainNavigationState extends State<MainNavigation> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(isSelected ? activeIcon : icon, color: color, size: 26),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(isSelected ? activeIcon : icon, color: color, size: 24),
+              if (hasBadge)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 10, minHeight: 10),
+                    child: Text(
+                      '$_pendingInvitesCount',
+                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
               color: color,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),

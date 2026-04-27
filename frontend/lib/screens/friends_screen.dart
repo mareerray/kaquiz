@@ -60,38 +60,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
           iconTheme: const IconThemeData(color: Colors.black87),
           actions: [
             IconButton(
-              icon: Stack(
-                children: [
-                  const Icon(Icons.notifications_none),
-                  if (_pendingCount > 0)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
-                        child: Text(
-                          '$_pendingCount',
-                          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const InvitesScreen()),
-                );
-                _loadData(); // Refresh when coming back
-              },
-            ),
-            IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _loadData,
             ),

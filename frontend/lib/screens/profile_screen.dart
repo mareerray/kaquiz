@@ -1,9 +1,11 @@
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/session_service.dart';
-import '../services/auth_service.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
-import 'login_screen.dart';
+import '../services/session_service.dart';
+import '../services/supabase_service.dart';
+import '../utils/ui_utils.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,46 +17,72 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
   final SessionService _session = SessionService();
-  final AuthService _auth = AuthService();
+  final SupabaseService _supabaseService = SupabaseService();
+  final _picker = ImagePicker();
   
-  final TextEditingController _nameController = TextEditingController();
-  String? _avatarUrl;
+  final _nameController = TextEditingController();
+  File? _selectedImage;
+  bool _isLoading = false;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    // Default or current name from session (if we stored it)
-    _nameController.text = _session.name ?? "Explorer";
-    _avatarUrl = _session.avatar ?? "";
+    _nameController.text = _session.name ?? '';
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _updateProfile() async {
-    setState(() => _isSaving = true);
-    
-    final success = await _apiService.updateUserProfile(
-      _nameController.text.trim(),
-      _avatarUrl ?? "", // Avatar URL
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70, // Compressing for faster upload
     );
+    
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
+    }
+  }
 
-    if (success) {
-      _session.name = _nameController.text.trim(); // keep session in sync
+  Future<void> _saveProfile() async {
+    if (_nameController.text.trim().isEmpty) {
+      UIUtils.showError(context, "Name cannot be empty");
+      return;
     }
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? 'Profile updated! ✨' : 'Failed to update profile.'),
-          backgroundColor: success ? Colors.green : Colors.redAccent,
-        ),
+    setState(() => _isSaving = true);
+    
+    try {
+      String? avatarUrl = _session.avatar;
+
+      // 1. If new image selected, upload to Supabase
+      if (_selectedImage != null) {
+        final userId = _session.email ?? 'user';
+        // This will now THROW an exception on error, going straight to catch block
+        avatarUrl = await _supabaseService.uploadAvatar(_selectedImage!, userId);
+      }
+
+      // 2. Update backend
+      final success = await _apiService.updateUserProfile(
+        _nameController.text.trim(),
+        avatarUrl ?? '',
       );
-      setState(() => _isSaving = false);
+
+      if (success && mounted) {
+        // 3. Update local session
+        _session.name = _nameController.text.trim();
+        _session.avatar = avatarUrl;
+        
+        UIUtils.showSuccess(context, "Profile updated successfully! ✨");
+        setState(() => _selectedImage = null);
+      } else {
+        if (mounted) UIUtils.showError(context, "Failed to update profile on backend.");
+      }
+    } catch (e) {
+      debugPrint("🔴 Profile Save Error: $e");
+      if (mounted) UIUtils.showError(context, "Error: $e");
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -95,142 +123,161 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _handleLogout() async {
-    _session.clear();
-    await _auth.signOut();
+    await _session.clearSession();
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final String initial = (_session.name?.isNotEmpty == true) ? _session.name![0].toUpperCase() : "U";
+    final String? avatarUrl = _selectedImage != null ? null : _session.avatar;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('My Profile', style: TextStyle(color: Colors.black87)),
+        title: const Text('My Profile', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            onPressed: _handleLogout,
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            // Avatar
-            GestureDetector(
-              onTap: _pickAvatar, // ✅ tap to change avatar
-              child: Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFF5F7FA), Color(0xFFE8EAF6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
+          child: Column(
+            children: [
+              // Avatar Section with Glassmorphism
+              Center(
+                child: Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Colors.deepPurple, Colors.pinkAccent],
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.deepPurple.withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 70,
+                        backgroundColor: Colors.white,
+                        backgroundImage: _selectedImage != null 
+                            ? FileImage(_selectedImage!) as ImageProvider
+                            : (avatarUrl != null && avatarUrl.isNotEmpty)
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                        child: (_selectedImage == null && (avatarUrl == null || avatarUrl.isEmpty))
+                            ? Text(initial, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.deepPurple))
+                            : null,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 5,
+                      right: 5,
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Colors.deepPurple,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+
+              // Info Card
+              ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("DISPLAY NAME", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Enter your name",
+                          ),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        const Text("EMAIL ADDRESS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+                        const SizedBox(height: 8),
+                        Text(_session.email ?? "Not signed in", style: const TextStyle(fontSize: 16, color: Colors.black54)),
                       ],
                     ),
-                    child: CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.deepPurple,
-                      backgroundImage: (_avatarUrl ?? "").isNotEmpty
-                          ? NetworkImage(_avatarUrl!)
-                          : null,
-                      child: (_avatarUrl ?? "").isEmpty
-                          ? const Icon(Icons.person, size: 60, color: Colors.white)
-                          : null,
-                    ),
                   ),
-                  // ✅ Camera icon overlay
-                  Positioned(
-                    bottom: 4,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.deepPurple,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                    ),
-                  ),
-                ],
-              ),
-            ),            
-            const SizedBox(height: 24),
-
-            // Email (non-editable)
-            Text(
-              _session.email ?? "Not available",
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54),
-            ),
-
-            const SizedBox(height: 32),
-            // Editable Name Field
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Display Name',
-                  border: InputBorder.none,
-                  prefixIcon: Icon(Icons.edit, color: Colors.deepPurple),
                 ),
               ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Save Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _updateProfile,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              
+              const SizedBox(height: 40),
+
+              // Save Button
+              SizedBox(
+                width: double.infinity,
+                height: 60,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 5,
+                  ),
+                  child: _isSaving 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("Save Changes", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
-                child: _isSaving 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-            ),
-            
-            const SizedBox(height: 100),
-            
-            // Logout Button
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
+
+              const SizedBox(height: 20),
+              
+              TextButton.icon(
                 onPressed: _handleLogout,
-                icon: const Icon(Icons.logout),
-                label: const Text('Log Out'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.redAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
+                icon: const Icon(Icons.logout, color: Colors.redAccent),
+                label: const Text("Log Out", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
