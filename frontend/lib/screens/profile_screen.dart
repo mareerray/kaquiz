@@ -104,12 +104,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('My Profile', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
-            onPressed: _handleLogout,
-          ),
-        ],
       ),
       body: Container(
         width: double.infinity,
@@ -122,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
+          padding: const EdgeInsets.fromLTRB(24, 120, 24, 80),
           child: Column(
             children: [
               // Avatar Section with Glassmorphism
