@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../utils/ui_utils.dart';
@@ -15,7 +16,6 @@ class _SearchScreenState extends State<SearchScreen> {
   
   Map<String, dynamic>? _foundUser;
   bool _isSearching = false;
-  String? _error;
 
   Timer? _debounce;
 
@@ -27,7 +27,6 @@ class _SearchScreenState extends State<SearchScreen> {
       } else {
         setState(() {
           _foundUser = null;
-          _error = null;
         });
       }
     });
@@ -36,20 +35,26 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _performSearch(String email) async {
     setState(() {
       _isSearching = true;
-      _error = null;
     });
 
     try {
       final user = await _apiService.searchUsers(email);
-      setState(() {
-        _foundUser = user;
+      if (mounted) {
+        setState(() {
+          _foundUser = user;
+        });
         if (user == null) {
-        if (mounted) UIUtils.showError(context, "No user found with this email.");
+          UIUtils.showError(context, "No user found with this email.");
+        }
       }
     } catch (e) {
-      if (mounted) UIUtils.showError(context, "An error occurred while searching.");
+      if (mounted) {
+        UIUtils.showError(context, "An error occurred while searching.");
+      }
     } finally {
-      if (mounted) setState(() => _isSearching = false);
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
     }
   }
 
@@ -143,15 +148,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 : null,
           ),
-          // Avatar
-          // CircleAvatar(
-          //   radius: 40,
-          //   backgroundColor: Colors.deepPurple,
-          //   child: Text(
-          //     user['name']?[0]?.toUpperCase() ?? 'U',
-          //     style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
-          //   ),
-          // ),
           
           const SizedBox(height: 16),
           
@@ -170,29 +166,27 @@ class _SearchScreenState extends State<SearchScreen> {
           // Add Friend Button
           SizedBox(
             width: double.infinity,
-            child: _isSearching 
-              ? const Center(child: CircularProgressIndicator())
-              : ElevatedButton(
-                  onPressed: () async {
-                    if (user['id'] == null) return;
-                    
-                    final success = await _apiService.sendFriendRequest(user['id']);
-                    if (mounted) {
-                      if (success) {
-                        UIUtils.showSuccess(context, 'Friend request sent to ${user['name']}! 📨');
-                      } else {
-                        UIUtils.showError(context, 'Failed to send request. Maybe already sent?');
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: const Text('Add Friend'),
-                ),
+            child: ElevatedButton(
+              onPressed: () async {
+                if (user['id'] == null) return;
+                
+                final success = await _apiService.sendFriendRequest(user['id']);
+                if (mounted) {
+                  if (success) {
+                    UIUtils.showSuccess(context, 'Friend request sent to ${user['name']}! 📨');
+                  } else {
+                    UIUtils.showError(context, 'Failed to send request. Maybe already sent?');
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: const Text('Add Friend'),
+            ),
           ),
         ],
       ),

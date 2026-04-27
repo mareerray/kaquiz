@@ -4,10 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/location_service.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../utils/marker_utils.dart';
 import 'search_screen.dart';
-import 'profile_screen.dart';
-import 'friends_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -20,6 +19,7 @@ class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final LocationService _locationService = LocationService();
   final ApiService _apiService = ApiService();
+  final SessionService _session = SessionService();
   
   LatLng? _currentPosition;
   bool _isMapLoading = true;
@@ -37,20 +37,17 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _initializeLocation();
     
-    // Day 7: Start polling for friends' locations every 10 seconds (increased from 30s for responsiveness)
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (_currentPosition != null) {
         _updateFriendsMarkers();
       }
     });
 
-    // Day 12: Start sending OWN location to server every 5 seconds
     _locationUpdateTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       final newLocation = await _locationService.getCurrentLocation();
       if (newLocation != null) {
-        setState(() => _currentPosition = newLocation);
+        if (mounted) setState(() => _currentPosition = newLocation);
         _apiService.updateUserLocation(newLocation.latitude, newLocation.longitude);
-        debugPrint("📍 [${DateTime.now()}] Location sent: ${newLocation.latitude}, ${newLocation.longitude}");
       }
     });
   }
@@ -71,11 +68,7 @@ class _MapScreenState extends State<MapScreen> {
         _isMapLoading = false;
       });
       _goToCurrentPosition();
-      
-      // Send initial location to backend
       _apiService.updateUserLocation(location.latitude, location.longitude);
-      
-      // Day 7: Initial pull of friends
       _updateFriendsMarkers();
     } else {
       if (!mounted) return;
@@ -100,12 +93,10 @@ class _MapScreenState extends State<MapScreen> {
       final String? avatarUrl = friend['avatar'];
       final DateTime? lastSeen = friend['last_seen'] != null ? DateTime.parse(friend['last_seen']) : null;
       
-      // Only show marker if location is available
       if (lat == null || lng == null) continue;
 
       final String status = lastSeen != null ? _formatLastSeen(lastSeen) : 'Never seen';
 
-      // Generate custom circular marker icon
       final icon = await MarkerUtils.getAvatarMarker(
         url: avatarUrl,
         name: name,
@@ -129,6 +120,28 @@ class _MapScreenState extends State<MapScreen> {
     setState(() {
       _friendsMarkers = newMarkers;
     });
+
+    // Add SELF marker with a STAR
+    final selfMarker = await MarkerUtils.getAvatarMarker(
+      url: _session.avatar,
+      name: _session.name ?? 'Me',
+      color: Colors.blueAccent,
+      hasStar: true,
+    );
+
+    if (mounted) {
+      setState(() {
+        _friendsMarkers.add(
+          Marker(
+            markerId: const MarkerId('me_marker'),
+            position: _currentPosition!,
+            icon: selfMarker,
+            zIndex: 10, // Keep self on top
+            infoWindow: const InfoWindow(title: 'You', snippet: 'Your current location'),
+          ),
+        );
+      });
+    }
   }
 
   String _formatLastSeen(DateTime lastSeen) {
@@ -157,20 +170,19 @@ class _MapScreenState extends State<MapScreen> {
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // The Map
           GoogleMap(
             mapType: MapType.normal,
             initialCameraPosition: _kInitialPosition,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false, // Custom button instead
+            myLocationEnabled: false, 
+            myLocationButtonEnabled: false, 
             zoomControlsEnabled: false,
-            markers: _friendsMarkers, // Day 7: Friend avatars
+            markers: _friendsMarkers,
             onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
             },
           ),
 
-          // Top Overlay (Search Bar / Profile)
+          // Top Overlay (Search Bar)
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
             left: 20,
@@ -178,11 +190,9 @@ class _MapScreenState extends State<MapScreen> {
             child: _buildTopOverlay(),
           ),
 
-          // Bottom Overlay (Friend Info / Actions) - Future Phase
-          
-          // Floating Action Buttons
+          // Floating Action Buttons (Moved up for Nav Bar)
           Positioned(
-            bottom: 30,
+            bottom: 125, 
             right: 20,
             child: Column(
               children: [

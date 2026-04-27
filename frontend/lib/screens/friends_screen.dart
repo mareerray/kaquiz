@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'search_screen.dart';
 import 'invites_screen.dart';
@@ -42,73 +43,83 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: const Text('My Friends', style: TextStyle(color: Colors.black87)),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF5F7FA), Color(0xFFE8EAF6)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        actions: [
-          IconButton(
-            icon: Stack(
-              children: [
-                const Icon(Icons.notifications_none),
-                if (_pendingCount > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
-                      child: Text(
-                        '$_pendingCount',
-                        style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
+        appBar: AppBar(
+          title: const Text('Friends List', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.black87),
+          actions: [
+            IconButton(
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications_none),
+                  if (_pendingCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
+                        child: Text(
+                          '$_pendingCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const InvitesScreen()),
+                );
+                _loadData(); // Refresh when coming back
+              },
             ),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const InvitesScreen()),
-              );
-              _loadData(); // Refresh when coming back
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: Column(
-                children: [
-                _buildAddFriendHeader(),
-                Expanded(
-                  child: _friends.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: _friends.length,
-                          itemBuilder: (context, index) {
-                            return _buildFriendCard(_friends[index]);
-                          },
-                        ),
-                ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadData,
+            ),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                child: Column(
+                  children: [
+                    _buildAddFriendHeader(),
+                    Expanded(
+                      child: _friends.isEmpty
+                          ? _buildEmptyState()
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
+                              itemCount: _friends.length,
+                              itemBuilder: (context, index) {
+                                return _buildFriendCard(_friends[index]);
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 100), // Space for floating nav bar
                   ],
                 ),
               ),
+      ),
     );
   }
 
@@ -119,7 +130,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => SearchScreen()),
+            MaterialPageRoute(builder: (context) => const SearchScreen()),
           );
         },
         child: Container(
@@ -156,8 +167,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   bool _isOnline(String? lastSeenStr) {
     if (lastSeenStr == null) return false;
-    final lastSeen = DateTime.parse(lastSeenStr);
-    return DateTime.now().difference(lastSeen).inMinutes < 5;
+    try {
+      final lastSeen = DateTime.parse(lastSeenStr);
+      return DateTime.now().difference(lastSeen).inMinutes < 5;
+    } catch (e) {
+      return false;
+    }
   }
 
   Widget _buildFriendCard(dynamic friend) {
@@ -167,73 +182,71 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.deepPurple.shade100,
-                backgroundImage: avatar != null && avatar.isNotEmpty ? NetworkImage(avatar) : null,
-                child: avatar == null || avatar.isEmpty 
-                    ? Text(name[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold))
-                    : null,
-              ),
-              if (online)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+            ),
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Colors.deepPurple.shade100,
+                      backgroundImage: (avatar != null && avatar.isNotEmpty) 
+                          ? NetworkImage(avatar) 
+                          : null,
+                      child: (avatar == null || avatar.isEmpty) 
+                          ? Text(name[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold))
+                          : null,
                     ),
+                    if (online)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        online ? 'Online' : 'Offline',
+                        style: TextStyle(color: online ? Colors.green : Colors.grey.shade600, fontSize: 13),
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Text(
-                  online ? 'Online' : 'Offline',
-                  style: TextStyle(color: online ? Colors.green : Colors.grey.shade600, fontSize: 13),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  onPressed: () => _confirmDelete(friend),
                 ),
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.map, color: Colors.blue),
-            onPressed: () {
-              // Future: show this friend on map
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-            onPressed: () => _confirmDelete(friend),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -255,11 +268,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
 
     if (confirmed == true) {
-      // Optimistic UI update
-      setState(() {
-        _friends.removeWhere((f) => f['id'] == friend['id'] || f['email'] == friend['email']);
-      });
-
+      if (mounted) setState(() => _isLoading = true);
+      
       final success = await _apiService.deleteFriend(friend['id'] ?? 0);
       
       if (success && mounted) {
@@ -267,6 +277,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         _loadData();
       } else if (mounted) {
         UIUtils.showError(context, 'Failed to remove friend.');
+        setState(() => _isLoading = false);
       }
     }
   }

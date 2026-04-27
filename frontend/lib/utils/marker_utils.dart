@@ -12,22 +12,23 @@ class MarkerUtils {
     required String name,
     required Color color,
     int size = 120,
+    bool hasStar = false,
   }) async {
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
-    final double radius = size / 2;
+    final double radius = size / 2.0;
 
-    // Draw Shadow
+    // 1. Draw Shadow
     final Paint shadowPaint = Paint()
       ..color = Colors.black.withOpacity(0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawCircle(Offset(radius, radius + 2), radius, shadowPaint);
 
-    // Draw White Border
+    // 2. Draw White Border
     final Paint borderPaint = Paint()..color = Colors.white;
     canvas.drawCircle(Offset(radius, radius), radius, borderPaint);
 
-    // Draw Color Inner Circle (Background for initial or transparent images)
+    // 3. Draw Color Inner Circle (Background)
     final Paint innerPaint = Paint()..color = color;
     canvas.drawCircle(Offset(radius, radius), radius - 6, innerPaint);
 
@@ -36,29 +37,31 @@ class MarkerUtils {
       try {
         final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
         if (response.statusCode == 200) {
-          final ui.Codec codec = await ui.instantiateImageCodec(response.bodyBytes, targetWidth: size - 12, targetHeight: size - 12);
+          final ui.Codec codec = await ui.instantiateImageCodec(
+            response.bodyBytes, 
+            targetWidth: (size - 12).toInt(), 
+            targetHeight: (size - 12).toInt()
+          );
           final ui.FrameInfo fi = await codec.getNextFrame();
           
           final ui.Image image = fi.image;
           
-          // Clip to circle
+          canvas.save();
           final Path path = Path()..addOval(Rect.fromCircle(center: Offset(radius, radius), radius: radius - 6));
           canvas.clipPath(path);
-          
-          // Draw image
           canvas.drawImage(image, Offset(radius - (image.width / 2), radius - (image.height / 2)), Paint());
+          canvas.restore();
           imageLoaded = true;
         }
       } catch (e) {
-        print("Error loading avatar for $name: $e");
+        debugPrint("Error loading avatar for $name: $e");
       }
     }
 
     if (!imageLoaded) {
-      // Draw Initial Text if no image
       final TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
       textPainter.text = TextSpan(
-        text: name[0].toUpperCase(),
+        text: name.isNotEmpty ? name[0].toUpperCase() : '?',
         style: TextStyle(
           fontSize: radius,
           fontWeight: FontWeight.bold,
@@ -69,6 +72,35 @@ class MarkerUtils {
       textPainter.paint(
         canvas,
         Offset(radius - (textPainter.width / 2), radius - (textPainter.height / 2)),
+      );
+    }
+
+    // 4. Draw Star Badge if needed
+    if (hasStar) {
+      final double starRadius = radius * 0.4;
+      final Offset starPos = Offset(radius * 1.6, radius * 0.4);
+      
+      // Star Background (Border)
+      final Paint starBorderPaint = Paint()..color = Colors.white;
+      canvas.drawCircle(starPos, starRadius, starBorderPaint);
+      
+      // Star Inner (Gold)
+      final Paint starPaint = Paint()..color = Colors.amber;
+      canvas.drawCircle(starPos, starRadius - 2, starPaint);
+      
+      // Star Icon
+      TextPainter starIconPainter = TextPainter(textDirection: TextDirection.ltr);
+      starIconPainter.text = TextSpan(
+        text: '★',
+        style: TextStyle(
+          fontSize: starRadius * 1.4,
+          color: Colors.white,
+        ),
+      );
+      starIconPainter.layout();
+      starIconPainter.paint(
+        canvas,
+        Offset(starPos.dx - (starIconPainter.width / 2), starPos.dy - (starIconPainter.height / 2)),
       );
     }
 
