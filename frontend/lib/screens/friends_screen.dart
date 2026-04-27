@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'search_screen.dart';
 import 'invites_screen.dart';
 import '../services/api_service.dart';
+import '../utils/ui_utils.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -261,13 +262,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
       final success = await _apiService.deleteFriend(friend['id'] ?? 0);
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? '${friend['name']} removed.' : 'Failed to remove from server.'),
-            backgroundColor: success ? Colors.black87 : Colors.redAccent,
-          ),
-        );
+      if (success && mounted) {
+        UIUtils.showSuccess(context, 'Friend removed.');
+        _loadData();
+      } else if (mounted) {
+        UIUtils.showError(context, 'Failed to remove friend.');
       }
     }
   }

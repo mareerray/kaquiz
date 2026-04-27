@@ -1,6 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../utils/ui_utils.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -44,15 +44,12 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _foundUser = user;
         if (user == null) {
-          _error = "No user found with this email.";
-        }
-      });
+        if (mounted) UIUtils.showError(context, "No user found with this email.");
+      }
     } catch (e) {
-      setState(() {
-        _error = "An error occurred while searching.";
-      });
+      if (mounted) UIUtils.showError(context, "An error occurred while searching.");
     } finally {
-      setState(() => _isSearching = false);
+      if (mounted) setState(() => _isSearching = false);
     }
   }
 
@@ -107,8 +104,6 @@ class _SearchScreenState extends State<SearchScreen> {
             // Search Results
             if (_isSearching)
               const CircularProgressIndicator()
-            else if (_error != null)
-              Text(_error!, style: TextStyle(color: Colors.grey.shade600))
             else if (_foundUser != null)
               _buildUserCard(_foundUser!)
             else
@@ -183,14 +178,11 @@ class _SearchScreenState extends State<SearchScreen> {
                     
                     final success = await _apiService.sendFriendRequest(user['id']);
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(success 
-                            ? 'Friend request sent to ${user['name']}! 📨' 
-                            : 'Failed to send request. Maybe already sent?'),
-                          backgroundColor: success ? Colors.green : Colors.redAccent,
-                        ),
-                      );
+                      if (success) {
+                        UIUtils.showSuccess(context, 'Friend request sent to ${user['name']}! 📨');
+                      } else {
+                        UIUtils.showError(context, 'Failed to send request. Maybe already sent?');
+                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(
