@@ -61,7 +61,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // 1. If new image selected, upload to Supabase
       if (_selectedImage != null) {
         final userId = _session.email ?? 'user';
-        avatarUrl = await _supabaseService.uploadAvatar(_selectedImage!, userId);
+        final uploadedUrl = await _supabaseService.uploadAvatar(_selectedImage!, userId);
+        
+        if (uploadedUrl != null) {
+          avatarUrl = uploadedUrl;
+        } else {
+          if (mounted) {
+            UIUtils.showError(context, "Failed to upload image to Cloud. Please check if 'avatars' bucket exists and is public.");
+          }
+          setState(() => _isSaving = false);
+          return; // STOP HERE if upload failed
+        }
       }
 
       // 2. Update backend
