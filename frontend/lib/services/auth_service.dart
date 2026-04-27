@@ -4,8 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    // We only need the client ID for iOS, and we added it to Info.plist
-    // We can also explicitly specify it here if needed, but Info.plist is better.
+    clientId: kIsWeb ? null : dotenv.env['GOOGLE_IOS_CLIENT_ID'],
     serverClientId: dotenv.env['WEB_CLIENT_ID'],
   );
 
