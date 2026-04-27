@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/ui_utils.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -89,7 +90,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handleLogout() async {
     await _session.clearSession();
     if (mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      // Direct navigation is safer if routes are being problematic
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
