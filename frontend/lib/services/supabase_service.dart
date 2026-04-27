@@ -34,11 +34,11 @@ class SupabaseService {
     try {
       await initialize();
       
-      // Sanitize userId for filename
-      final safeId = userId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-      final fileName = 'avatar_${safeId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      // Using a simpler filename pattern to avoid RLS issues with special chars
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'user_avatar_$timestamp.jpg';
       
-      debugPrint("🔵 Uploading to Supabase: $fileName (User: $userId)");
+      debugPrint("🔵 Uploading to Supabase: $fileName");
       
       final storage = Supabase.instance.client.storage.from('avatars');
       
