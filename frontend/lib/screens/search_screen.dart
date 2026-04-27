@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../utils/ui_utils.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -15,9 +16,24 @@ class _SearchScreenState extends State<SearchScreen> {
   
   Map<String, dynamic>? _foundUser;
   bool _isSearching = false;
-  String? _error;
+  bool _isRequestSent = false; 
+  bool _isAlreadyFriend = false; // Check if the searched user is already a friend
 
   Timer? _debounce;
+  List<dynamic> _myFriends = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFriends();
+  }
+
+  Future<void> _loadFriends() async {
+    final friends = await _apiService.getFriends();
+    if (mounted) {
+      setState(() => _myFriends = friends);
+    }
+  }
 
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
@@ -27,33 +43,57 @@ class _SearchScreenState extends State<SearchScreen> {
       } else {
         setState(() {
           _foundUser = null;
-          _error = null;
+          _isRequestSent = false;
+          _isAlreadyFriend = false;
         });
       }
     });
   }
 
   Future<void> _performSearch(String email) async {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    
     setState(() {
       _isSearching = true;
-      _error = null;
+      _isRequestSent = false;
+      _isAlreadyFriend = false;
     });
 
     try {
       final user = await _apiService.searchUsers(email);
-      setState(() {
-        _foundUser = user;
-        if (user == null) {
-          _error = "No user found with this email.";
+      if (mounted) {
+        bool friend = false;
+        if (user != null) {
+          friend = _myFriends.any((f) => f['id'] == user['id'] || f['email'] == user['email']);
         }
-      });
+        
+        setState(() {
+          _foundUser = user;
+          _isAlreadyFriend = friend;
+        });
+        
+        if (user == null) {
+          UIUtils.showError(context, "No user found with this email.");
+        }
+      }
     } catch (e) {
-      setState(() {
-        _error = "An error occurred while searching.";
-      });
+      if (mounted) {
+        UIUtils.showError(context, "An error occurred while searching.");
+      }
     } finally {
-      setState(() => _isSearching = false);
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
     }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _foundUser = null;
+      _isRequestSent = false;
+      _isAlreadyFriend = false;
+    });
   }
 
   @override
@@ -77,7 +117,7 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            // Search Input
+            // Search Input with Clear (X) button
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -94,10 +134,16 @@ class _SearchScreenState extends State<SearchScreen> {
               child: TextField(
                 controller: _searchController,
                 onChanged: _onSearchChanged,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Enter friend\'s email...',
                   border: InputBorder.none,
-                  icon: Icon(Icons.search, color: Colors.deepPurple),
+                  icon: const Icon(Icons.search, color: Colors.deepPurple),
+                  suffixIcon: _searchController.text.isNotEmpty 
+                    ? IconButton(
+                        icon: const Icon(Icons.cancel, color: Colors.grey),
+                        onPressed: _clearSearch,
+                      )
+                    : null,
                 ),
               ),
             ),
@@ -107,8 +153,6 @@ class _SearchScreenState extends State<SearchScreen> {
             // Search Results
             if (_isSearching)
               const CircularProgressIndicator()
-            else if (_error != null)
-              Text(_error!, style: TextStyle(color: Colors.grey.shade600))
             else if (_foundUser != null)
               _buildUserCard(_foundUser!)
             else
@@ -148,19 +192,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 : null,
           ),
-          // Avatar
-          // CircleAvatar(
-          //   radius: 40,
-          //   backgroundColor: Colors.deepPurple,
-          //   child: Text(
-          //     user['name']?[0]?.toUpperCase() ?? 'U',
-          //     style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
-          //   ),
-          // ),
-          
           const SizedBox(height: 16),
-          
-          // User Info
           Text(
             user['name'] ?? 'Unknown User',
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -169,38 +201,50 @@ class _SearchScreenState extends State<SearchScreen> {
             user['email'] ?? '',
             style: TextStyle(color: Colors.grey.shade600),
           ),
-          
           const SizedBox(height: 24),
           
-          // Add Friend Button
-          SizedBox(
-            width: double.infinity,
-            child: _isSearching 
-              ? const Center(child: CircularProgressIndicator())
-              : ElevatedButton(
-                  onPressed: () async {
-                    if (user['id'] == null) return;
-                    
-                    final success = await _apiService.sendFriendRequest(user['id']);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(success 
-                            ? 'Friend request sent to ${user['name']}! 📨' 
-                            : 'Failed to send request. Maybe already sent?'),
-                          backgroundColor: success ? Colors.green : Colors.redAccent,
-                        ),
-                      );
-                    }
-                  },
+          // Action Area
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: (_isRequestSent || _isAlreadyFriend) 
+                    ? null 
+                    : () async {
+                        if (user['id'] == null) return;
+                        final success = await _apiService.sendFriendRequest(user['id']);
+                        if (mounted && success) {
+                          setState(() => _isRequestSent = true);
+                          UIUtils.showSuccess(context, 'Request sent!');
+                        }
+                      },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: _isAlreadyFriend 
+                        ? Colors.green.shade400 
+                        : (_isRequestSent ? Colors.grey.shade400 : Colors.deepPurple),
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: _isAlreadyFriend ? Colors.green.shade300 : Colors.grey.shade300,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text('Add Friend'),
+                  child: Text(
+                    _isAlreadyFriend 
+                        ? 'Already Friends' 
+                        : (_isRequestSent ? 'Pending...' : 'Add Friend')
+                  ),
                 ),
+              ),
+              if (_isRequestSent) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  onPressed: () {
+                    setState(() => _isRequestSent = false);
+                    UIUtils.showInfo(context, "Search cleared.");
+                  },
+                )
+              ]
+            ],
           ),
         ],
       ),

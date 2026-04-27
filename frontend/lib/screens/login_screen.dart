@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../main_navigation.dart';
+import '../utils/ui_utils.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -33,9 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       if (jwtToken != null && mounted) {
         if (jwtToken.startsWith('ERROR:')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jwtToken)),
-          );
+          UIUtils.showError(context, jwtToken.replaceFirst('ERROR:', '').trim());
         } else {
           // Save to session
           _session.setToken(jwtToken);
@@ -49,12 +48,10 @@ class _LoginScreenState extends State<LoginScreen> {
             MaterialPageRoute(builder: (context) => const MainNavigation()),
           );
         }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text('Failed to authenticate with backend! Is Go running?')),
-          );
-        }
+      }
+    } else {
+      if (mounted) {
+        UIUtils.showError(context, 'Google Sign-In failed or cancelled.');
       }
     }
     
