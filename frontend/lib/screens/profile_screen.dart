@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/session_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
@@ -57,6 +58,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _pickAvatar() async {
+    setState(() => _isSaving = true);
+  
+    final supabaseUser = Supabase.instance.client.auth.currentUser;
+    if (supabaseUser == null) {
+      throw Exception('No Supabase user found');
+    }    
+    
+    final url = await _apiService.uploadAvatar(supabaseUser.id);
+
+    if (url != null) {
+      final success = await _apiService.updateUserProfile(
+        _nameController.text.trim(), // keep current name
+        url,
+      );
+      if (success) {
+        setState(() => _avatarUrl = url); // show new avatar immediately
+        _session.avatar = url;            // keep session in sync
+        _session.name = _nameController.text.trim(); // also update name in session just in case
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Avatar updated! ✨'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+
+    setState(() => _isSaving = false);
+  }
+
   void _handleLogout() async {
     _session.clear();
     await _auth.signOut();
@@ -83,32 +120,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             // Avatar
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+            GestureDetector(
+              onTap: _pickAvatar, // ✅ tap to change avatar
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.deepPurple,
+                      backgroundImage: (_avatarUrl ?? "").isNotEmpty
+                          ? NetworkImage(_avatarUrl!)
+                          : null,
+                      child: (_avatarUrl ?? "").isEmpty
+                          ? const Icon(Icons.person, size: 60, color: Colors.white)
+                          : null,
+                    ),
+                  ),
+                  // ✅ Camera icon overlay
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.deepPurple,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                    ),
                   ),
                 ],
               ),
-              child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.deepPurple,
-              backgroundImage: (_avatarUrl ?? "").isNotEmpty
-                  ? NetworkImage(_avatarUrl!)
-                  : null,
-              child: (_avatarUrl ?? "").isEmpty
-                  ? const Icon(Icons.person, size: 60, color: Colors.white)
-                  : null,
-            ),
-            ),
-            
+            ),            
             const SizedBox(height: 24),
-            
+
             // Email (non-editable)
             Text(
               _session.email ?? "Not available",

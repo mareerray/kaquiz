@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'session_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 
 class ApiService {
   final _session = SessionService();
@@ -157,6 +160,45 @@ class ApiService {
     }
   }
 
+  Future<String?> uploadAvatar(String userId) async {
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image == null) return null;
+
+      final file = File(image.path);
+      final supabase = Supabase.instance.client;
+
+      final filePath = '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      await supabase.storage.from('avatars').upload(
+        filePath,
+        file,
+        fileOptions: const FileOptions(
+          contentType: 'image/jpeg',
+        ),
+      );
+
+      final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+      if (supabaseUrl.isEmpty) {
+        throw Exception('SUPABASE_URL is missing from .env');
+      }
+
+      final publicUrl =
+    '$supabaseUrl/storage/v1/object/public/avatars/$filePath';      
+      debugPrint('🟢 Avatar uploaded: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      debugPrint('🔴 Avatar upload failed: $e');
+      return null;
+    }
+  }
   Future<void> fetchAndStoreUserInfo() async {
     try {
       final response = await http.get(
