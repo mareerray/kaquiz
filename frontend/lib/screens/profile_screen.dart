@@ -1,13 +1,11 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/supabase_service.dart';
-import '../services/auth_service.dart';
-import 'login_screen.dart';
 import '../utils/ui_utils.dart';
-import 'dart:ui';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,34 +15,28 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _session = SessionService();
-  final _apiService = ApiService();
-  final _supabaseService = SupabaseService();
-  final _auth = AuthService();
+  final ApiService _apiService = ApiService();
+  final SessionService _session = SessionService();
+  final SupabaseService _supabaseService = SupabaseService();
   final _picker = ImagePicker();
   
-  late TextEditingController _nameController;
-  bool _isSaving = false;
+  final _nameController = TextEditingController();
   File? _selectedImage;
+  bool _isLoading = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: _session.name ?? 'Explorer');
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
+    _nameController.text = _session.name ?? '';
   }
 
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 70,
+      imageQuality: 70, // Compressing for faster upload
     );
-
+    
     if (image != null) {
       setState(() {
         _selectedImage = File(image.path);
@@ -53,6 +45,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    if (_nameController.text.trim().isEmpty) {
+      UIUtils.showError(context, "Name cannot be empty");
+      return;
+    }
+
     setState(() => _isSaving = true);
     
     try {
@@ -61,17 +58,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // 1. If new image selected, upload to Supabase
       if (_selectedImage != null) {
         final userId = _session.email ?? 'user';
-        final uploadedUrl = await _supabaseService.uploadAvatar(_selectedImage!, userId);
-        
-        if (uploadedUrl != null) {
-          avatarUrl = uploadedUrl;
-        } else {
-          if (mounted) {
-            UIUtils.showError(context, "Failed to upload image to Cloud. Please check if 'avatars' bucket exists and is public.");
-          }
-          setState(() => _isSaving = false);
-          return; // STOP HERE if upload failed
-        }
+        // This will now THROW an exception on error, going straight to catch block
+        avatarUrl = await _supabaseService.uploadAvatar(_selectedImage!, userId);
       }
 
       // 2. Update backend
@@ -88,190 +76,173 @@ class _ProfileScreenState extends State<ProfileScreen> {
         UIUtils.showSuccess(context, "Profile updated successfully! ✨");
         setState(() => _selectedImage = null);
       } else {
-        if (mounted) UIUtils.showError(context, "Failed to save profile on server.");
+        if (mounted) UIUtils.showError(context, "Failed to update profile on backend.");
       }
     } catch (e) {
-      if (mounted) UIUtils.showError(context, "An error occurred: $e");
+      debugPrint("🔴 Profile Save Error: $e");
+      if (mounted) UIUtils.showError(context, "Error: $e");
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
   void _handleLogout() async {
-    _session.clear();
-    await _auth.signOut();
+    await _session.clearSession();
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final String initial = (_session.name?.isNotEmpty == true) ? _session.name![0].toUpperCase() : "U";
+    final String? avatarUrl = _selectedImage != null ? null : _session.avatar;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('My Profile', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            _buildAvatarSection(),
-            const SizedBox(height: 40),
-            _buildInfoCard(),
-            const SizedBox(height: 40),
-            _buildSaveButton(),
-            const SizedBox(height: 60),
-            _buildLogoutButton(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvatarSection() {
-    return Center(
-      child: Stack(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Colors.deepPurple, Colors.blueAccent, Colors.pinkAccent],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.deepPurple.withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: CircleAvatar(
-              radius: 70,
-              backgroundColor: Colors.white,
-              backgroundImage: _selectedImage != null
-                  ? FileImage(_selectedImage!)
-                  : (_session.avatar != null && _session.avatar!.isNotEmpty
-                      ? NetworkImage(_session.avatar!)
-                      : null) as ImageProvider?,
-              child: (_selectedImage == null && (_session.avatar == null || _session.avatar!.isEmpty))
-                  ? Text(
-                      (_session.name?.isNotEmpty ?? false) ? _session.name![0].toUpperCase() : 'U',
-                      style: const TextStyle(fontSize: 50, fontWeight: FontWeight.bold, color: Colors.deepPurple),
-                    )
-                  : null,
-            ),
-          ),
-          Positioned(
-            bottom: 4,
-            right: 4,
-            child: GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: const Icon(Icons.camera_alt, color: Colors.white, size: 22),
-              ),
-            ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            onPressed: _handleLogout,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildInfoCard() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.5)),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFF5F7FA), Color(0xFFE8EAF6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "DISPLAY NAME",
-                style: TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-              ),
-              TextField(
-                controller: _nameController,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                decoration: const InputDecoration(
-                  hintText: "Enter your name",
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+              // Avatar Section with Glassmorphism
+              Center(
+                child: Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Colors.deepPurple, Colors.pinkAccent],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.deepPurple.withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 70,
+                        backgroundColor: Colors.white,
+                        backgroundImage: _selectedImage != null 
+                            ? FileImage(_selectedImage!) as ImageProvider
+                            : (avatarUrl != null && avatarUrl.isNotEmpty)
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                        child: (_selectedImage == null && (avatarUrl == null || avatarUrl.isEmpty))
+                            ? Text(initial, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.deepPurple))
+                            : null,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 5,
+                      right: 5,
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Colors.deepPurple,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Divider(height: 32),
-              const Text(
-                "EMAIL ADDRESS",
-                style: TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+              const SizedBox(height: 40),
+
+              // Info Card
+              ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("DISPLAY NAME", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Enter your name",
+                          ),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        const Text("EMAIL ADDRESS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+                        const SizedBox(height: 8),
+                        Text(_session.email ?? "Not signed in", style: const TextStyle(fontSize: 16, color: Colors.black54)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                _session.email ?? "Not signed in",
-                style: const TextStyle(fontSize: 16, color: Colors.black87),
+              
+              const SizedBox(height: 40),
+
+              // Save Button
+              SizedBox(
+                width: double.infinity,
+                height: 60,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 5,
+                  ),
+                  child: _isSaving 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("Save Changes", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              
+              TextButton.icon(
+                onPressed: _handleLogout,
+                icon: const Icon(Icons.logout, color: Colors.redAccent),
+                label: const Text("Log Out", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isSaving ? null : _saveProfile,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.deepPurple,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          elevation: 5,
-          shadowColor: Colors.deepPurple.withOpacity(0.4),
-        ),
-        child: _isSaving
-            ? const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
-              )
-            : const Text(
-                "Save Changes",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    return TextButton.icon(
-      onPressed: _handleLogout,
-      icon: const Icon(Icons.logout_rounded),
-      label: const Text("Log Out"),
-      style: TextButton.styleFrom(
-        foregroundColor: Colors.redAccent,
-        iconColor: Colors.redAccent,
-        textStyle: const TextStyle(fontWeight: FontWeight.bold),
       ),
     );
   }
