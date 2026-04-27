@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -14,6 +15,7 @@ class LocationService {
       // Location services are not enabled don't continue
       // accessing the position and request users of the 
       // App to enable the location services.
+      debugPrint("🔴 Location services are not enabled");
       return false;
     }
 
@@ -26,12 +28,14 @@ class LocationService {
         // Android's shouldShowRequestPermissionRationale 
         // returned true. According to Android guidelines
         // your App should show an explanatory UI now.
+        debugPrint("🔴 Location permissions are denied");
         return false;
       }
     }
     
     if (permission == LocationPermission.deniedForever) {
       // Permissions are denied forever, handle appropriately. 
+      debugPrint("🔴 Location permissions are denied forever");
       return false;
     } 
 
@@ -50,7 +54,7 @@ class LocationService {
       
       return LatLng(position.latitude, position.longitude);
     } catch (e) {
-      print("Error getting location: $e");
+      debugPrint("Error getting location: $e");
       return null;
     }
   }

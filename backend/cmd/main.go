@@ -33,6 +33,7 @@ func main() {
 	protected := router.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware)
 	protected.HandleFunc("/users", handlers.UpdateUser).Methods("PUT")
+	protected.HandleFunc("/users/me", handlers.GetMyProfile).Methods("GET")
 	protected.HandleFunc("/users/search", handlers.SearchUsers).Methods("GET")
 	protected.HandleFunc("/locations", handlers.UpdateLocation).Methods("POST")
 	protected.HandleFunc("/invites/{user_id}", handlers.SendInvite).Methods("POST") // invites + receipeint ID in URL

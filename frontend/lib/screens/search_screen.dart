@@ -135,15 +135,28 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       child: Column(
         children: [
-          // Avatar
           CircleAvatar(
             radius: 40,
             backgroundColor: Colors.deepPurple,
-            child: Text(
-              user['name']?[0]?.toUpperCase() ?? 'U',
-              style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
-            ),
+            backgroundImage: (user['avatar'] != null && user['avatar'].toString().isNotEmpty)
+                ? NetworkImage(user['avatar'])
+                : null,
+            child: (user['avatar'] == null || user['avatar'].toString().isEmpty)
+                ? Text(
+                    user['name']?[0]?.toUpperCase() ?? 'U',
+                    style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
+                  )
+                : null,
           ),
+          // Avatar
+          // CircleAvatar(
+          //   radius: 40,
+          //   backgroundColor: Colors.deepPurple,
+          //   child: Text(
+          //     user['name']?[0]?.toUpperCase() ?? 'U',
+          //     style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
+          //   ),
+          // ),
           
           const SizedBox(height: 16),
           

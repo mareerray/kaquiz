@@ -17,13 +17,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _auth = AuthService();
   
   final TextEditingController _nameController = TextEditingController();
+  String? _avatarUrl;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     // Default or current name from session (if we stored it)
-    _nameController.text = "Explorer"; 
+    _nameController.text = _session.name ?? "Explorer";
+    _avatarUrl = _session.avatar ?? "";
   }
 
   @override
@@ -37,8 +39,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     final success = await _apiService.updateUserProfile(
       _nameController.text.trim(),
-      "", // Avatar URL - leaving empty for now
+      _avatarUrl ?? "", // Avatar URL
     );
+
+    if (success) {
+      _session.name = _nameController.text.trim(); // keep session in sync
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,15 +95,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              child: const CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.deepPurple,
-                child: Icon(Icons.person, size: 60, color: Colors.white),
-              ),
+              child: CircleAvatar(
+              radius: 60,
+              backgroundColor: Colors.deepPurple,
+              backgroundImage: (_avatarUrl ?? "").isNotEmpty
+                  ? NetworkImage(_avatarUrl!)
+                  : null,
+              child: (_avatarUrl ?? "").isEmpty
+                  ? const Icon(Icons.person, size: 60, color: Colors.white)
+                  : null,
+            ),
             ),
             
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             
+            // Email (non-editable)
+            Text(
+              _session.email ?? "Not available",
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54),
+            ),
+
+            const SizedBox(height: 32),
             // Editable Name Field
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

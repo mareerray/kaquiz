@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
@@ -28,16 +29,19 @@ class _LoginScreenState extends State<LoginScreen> {
       // 2. Send to Backend
       final jwtToken = await _apiService.authenticateWithBackend(idToken);
 
-      print("🔑 JWT TOKEN: $jwtToken");
+      debugPrint("🔑 JWT TOKEN: $jwtToken");
       
       if (jwtToken != null && mounted) {
         if (jwtToken.startsWith('ERROR:')) {
           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text(jwtToken)),
+            SnackBar(content: Text(jwtToken)),
           );
         } else {
           // Save to session
           _session.setToken(jwtToken);
+
+          // Fetch and store user info in session (name, email, avatar)
+          await _apiService.fetchAndStoreUserInfo();
 
           // Nav to Main Navigation (replaces the whole stack)
           Navigator.pushReplacement(
