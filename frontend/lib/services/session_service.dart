@@ -22,7 +22,7 @@ class SessionService {
   bool get IsLoggedIn => _jwtToken != null;
 
   /// Clears the token on logout
-  void clear() {
+  Future<void> clearSession() async {
     _jwtToken = null;
     name = null;
     email = null;
