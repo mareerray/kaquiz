@@ -17,9 +17,10 @@ class _SearchScreenState extends State<SearchScreen> {
   Map<String, dynamic>? _foundUser;
   bool _isSearching = false;
   bool _isRequestSent = false; 
-  bool _isAlreadyFriend = false; // Check if the searched user is already a friend
+  bool _isAlreadyFriend = false; 
 
   Timer? _debounce;
+  Timer? _statusPollingTimer; // Timer for checking acceptance status
   List<dynamic> _myFriends = [];
 
   @override
@@ -31,8 +32,29 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _loadFriends() async {
     final friends = await _apiService.getFriends();
     if (mounted) {
-      setState(() => _myFriends = friends);
+      setState(() {
+        _myFriends = friends;
+        // If we found a user and they are now in the friend list, update state
+        if (_foundUser != null) {
+          _isAlreadyFriend = _myFriends.any((f) => f['id'] == _foundUser!['id']);
+          if (_isAlreadyFriend) {
+            _stopPolling();
+          }
+        }
+      });
     }
+  }
+
+  void _startPolling() {
+    _stopPolling();
+    _statusPollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      _loadFriends();
+    });
+  }
+
+  void _stopPolling() {
+    _statusPollingTimer?.cancel();
+    _statusPollingTimer = null;
   }
 
   void _onSearchChanged(String query) {
@@ -41,18 +63,17 @@ class _SearchScreenState extends State<SearchScreen> {
       if (query.isNotEmpty) {
         _performSearch(query.trim().toLowerCase());
       } else {
-        setState(() {
-          _foundUser = null;
-          _isRequestSent = false;
-          _isAlreadyFriend = false;
-        });
+        _clearSearch();
       }
     });
   }
 
   Future<void> _performSearch(String email) async {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    _stopPolling();
     
+    await _loadFriends();
+
     setState(() {
       _isSearching = true;
       _isRequestSent = false;
@@ -64,7 +85,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) {
         bool friend = false;
         if (user != null) {
-          friend = _myFriends.any((f) => f['id'] == user['id'] || f['email'] == user['email']);
+          friend = _myFriends.any((f) => f['id'] == user['id']);
         }
         
         setState(() {
@@ -88,6 +109,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _clearSearch() {
+    _stopPolling();
     _searchController.clear();
     setState(() {
       _foundUser = null;
@@ -100,6 +122,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
+    _stopPolling();
     super.dispose();
   }
 
@@ -117,7 +140,6 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            // Search Input with Clear (X) button
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -126,8 +148,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    blurRadius: 10, offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -147,10 +168,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
             ),
-            
             const SizedBox(height: 32),
-            
-            // Search Results
             if (_isSearching)
               const CircularProgressIndicator()
             else if (_foundUser != null)
@@ -172,8 +190,7 @@ class _SearchScreenState extends State<SearchScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: 20, offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -202,8 +219,6 @@ class _SearchScreenState extends State<SearchScreen> {
             style: TextStyle(color: Colors.grey.shade600),
           ),
           const SizedBox(height: 24),
-          
-          // Action Area
           Row(
             children: [
               Expanded(
@@ -214,14 +229,17 @@ class _SearchScreenState extends State<SearchScreen> {
                         if (user['id'] == null) return;
                         final success = await _apiService.sendFriendRequest(user['id']);
                         if (mounted && success) {
-                          setState(() => _isRequestSent = true);
+                          setState(() {
+                            _isRequestSent = true;
+                          });
+                          _startPolling(); // Start watching for acceptance
                           UIUtils.showSuccess(context, 'Request sent!');
                         }
                       },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isAlreadyFriend 
                         ? Colors.green.shade400 
-                        : (_isRequestSent ? Colors.grey.shade400 : Colors.deepPurple),
+                        : (_isRequestSent ? Colors.orange.shade300 : Colors.deepPurple),
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: _isAlreadyFriend ? Colors.green.shade300 : Colors.grey.shade300,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -229,18 +247,18 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   child: Text(
                     _isAlreadyFriend 
-                        ? 'Already Friends' 
+                        ? 'Accepted!' 
                         : (_isRequestSent ? 'Pending...' : 'Add Friend')
                   ),
                 ),
               ),
-              if (_isRequestSent) ...[
+              if (_isRequestSent && !_isAlreadyFriend) ...[
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                   onPressed: () {
+                    _stopPolling();
                     setState(() => _isRequestSent = false);
-                    UIUtils.showInfo(context, "Search cleared.");
                   },
                 )
               ]
