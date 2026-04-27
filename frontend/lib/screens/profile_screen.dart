@@ -107,8 +107,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ),
             
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             
+            // Email (non-editable)
+            Text(
+              _session.email ?? "Not available",
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54),
+            ),
+
+            const SizedBox(height: 32),
             // Editable Name Field
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
