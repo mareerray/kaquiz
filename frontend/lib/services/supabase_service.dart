@@ -42,8 +42,12 @@ class SupabaseService {
       
       final storage = Supabase.instance.client.storage.from('avatars');
       
-      // Upload file
-      await storage.upload(fileName, imageFile);
+      // Explicitly set content type to help Supabase handle Android files
+      await storage.upload(
+        fileName, 
+        imageFile,
+        fileOptions: const FileOptions(contentType: 'image/jpeg'),
+      );
       
       final publicUrl = storage.getPublicUrl(fileName);
       debugPrint("🟢 Upload successful: $publicUrl");
