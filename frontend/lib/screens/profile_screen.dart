@@ -140,12 +140,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('My Profile', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
-            onPressed: _handleLogout,
-          ),
-        ],
       ),
       body: Container(
         width: double.infinity,
@@ -158,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
+          padding: const EdgeInsets.fromLTRB(24, 120, 24, 80),
           child: Column(
             children: [
               // Avatar Section with Glassmorphism
@@ -180,16 +174,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
-                      child: CircleAvatar(
-                        radius: 70,
-                        backgroundColor: Colors.white,
-                        backgroundImage: _selectedImage != null 
-                            ? FileImage(_selectedImage!) as ImageProvider
-                            : (avatarUrl != null && avatarUrl.isNotEmpty)
-                                ? NetworkImage(avatarUrl)
-                                : null,
+                      child: Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          image: (_selectedImage != null || (avatarUrl != null && avatarUrl.isNotEmpty))
+                              ? DecorationImage(
+                                  image: _selectedImage != null 
+                                      ? FileImage(_selectedImage!) as ImageProvider
+                                      : NetworkImage(avatarUrl!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
                         child: (_selectedImage == null && (avatarUrl == null || avatarUrl.isEmpty))
-                            ? Text(initial, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.deepPurple))
+                            ? Center(child: Text(initial, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.deepPurple)))
                             : null,
                       ),
                     ),
