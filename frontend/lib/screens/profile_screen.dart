@@ -23,7 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     // Default or current name from session (if we stored it)
-    _nameController.text = "Explorer"; 
+    _nameController.text = _session.name ?? "Explorer";
   }
 
   @override
@@ -39,6 +39,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _nameController.text.trim(),
       "", // Avatar URL - leaving empty for now
     );
+
+    if (success) {
+      _session.name = _nameController.text.trim(); // keep session in sync
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

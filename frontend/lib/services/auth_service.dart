@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -11,23 +12,23 @@ class AuthService {
   /// Triggers the Google Sign In flow and returns the idToken
   Future<String?> signInWithGoogle() async {
     try {
-      print("🔵 Starting Google Sign In...");
+      debugPrint("🔵 Starting Google Sign In...");
       // Force sign out first to clear any cached tokens with wrong audiences
       await _googleSignIn.signOut();
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
       if (account == null) {
-        print("🔴 User cancelled sign in");
+        debugPrint("🔴 User cancelled sign in");
         return null; // User canceled
       }
 
-      print("🟢 Account selected: ${account.email}");
+      debugPrint("🟢 Account selected: ${account.email}");
       final GoogleSignInAuthentication auth = await account.authentication;
 
-      print("🟢 Got idToken: ${auth.idToken != null ? 'YES ✅' : 'NULL ❌'}");
+      debugPrint("🟢 Got idToken: ${auth.idToken != null ? 'YES ✅' : 'NULL ❌'}");
       return auth.idToken;
     } catch (e) {
-      print("🔴 Google Sign In Error: $e");
+      debugPrint("🔴 Google Sign In Error: $e");
       return null;
     }
   }

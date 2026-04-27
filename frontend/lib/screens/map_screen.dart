@@ -44,15 +44,14 @@ class _MapScreenState extends State<MapScreen> {
       }
     });
 
-    // Day 12: Start sending OWN location to server every 10 seconds
-    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
-       if (_currentPosition != null) {
-          final newLocation = await _locationService.getCurrentLocation();
-          if (newLocation != null) {
-             setState(() => _currentPosition = newLocation);
-             _apiService.updateUserLocation(newLocation.latitude, newLocation.longitude);
-          }
-       }
+    // Day 12: Start sending OWN location to server every 5 seconds
+    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      final newLocation = await _locationService.getCurrentLocation();
+      if (newLocation != null) {
+        setState(() => _currentPosition = newLocation);
+        _apiService.updateUserLocation(newLocation.latitude, newLocation.longitude);
+        debugPrint("📍 [${DateTime.now()}] Location sent: ${newLocation.latitude}, ${newLocation.longitude}");
+      }
     });
   }
 

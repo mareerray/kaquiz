@@ -59,6 +59,32 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
     })
 }
 
+func GetMyProfile(w http.ResponseWriter, r *http.Request) {
+    // Step 1: Get userID from JWT token
+    userID := r.Context().Value(middleware.UserIDKey).(string)
+
+    // Step 2: Fetch user from database
+    var name, email string
+    var avatar *string
+    err := db.DB.QueryRow(context.Background(),
+        `SELECT name, email, avatar FROM users WHERE id = $1`,
+        userID,
+    ).Scan(&name, &email, &avatar)
+
+    if err != nil {
+        http.Error(w, "User not found", http.StatusNotFound)
+        return
+    }
+
+    // Step 3: Return user info
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "name":   name,
+        "email":  email,
+        "avatar": avatar,
+    })
+}
+
 func SearchUsers(w http.ResponseWriter, r *http.Request) {
 	// Get email from query: /users/search?email=maire@gmail.com
 	email := r.URL.Query().Get("email")

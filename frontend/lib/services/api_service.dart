@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'session_service.dart';
@@ -153,6 +154,25 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
+    }
+  }
+
+  Future<void> fetchAndStoreUserInfo() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/users/me'),
+        headers: {'Authorization': 'Bearer ${_session.token}'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _session.name   = data['name'];
+        _session.email  = data['email'];
+        _session.avatar = data['avatar'];
+        debugPrint("🟢 User info loaded: ${_session.name}");
+      }
+    } catch (e) {
+      debugPrint("🔴 Failed to fetch user info: $e");
     }
   }
 
