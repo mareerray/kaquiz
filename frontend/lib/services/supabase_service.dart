@@ -16,28 +16,32 @@ class SupabaseService {
     final key = dotenv.env['SUPABASE_KEY'] ?? '';
     
     if (url.isNotEmpty && key.isNotEmpty) {
-      await Supabase.initialize(url: url, anonKey: key);
-      _isInitialized = true;
+      try {
+        await Supabase.initialize(url: url, anonKey: key);
+        _isInitialized = true;
+      } catch (e) {
+        print("Supabase Init Error: $e");
+      }
     }
   }
 
-  Future<String?> uploadAvatar(File imageFile, String userId) async {
+  /// Returns the URL on success, or throws an error string on failure
+  Future<String> uploadAvatar(File imageFile, String userId) async {
     try {
       await initialize();
       
-      final fileName = 'avatar_$userId\_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final path = 'avatars/$fileName';
+      final fileName = 'avatar_${userId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = '$fileName'; // Direct in bucket
       
       final storage = Supabase.instance.client.storage.from('avatars');
       
       await storage.upload(path, imageFile);
       
-      // Get public URL
       final publicUrl = storage.getPublicUrl(path);
       return publicUrl;
     } catch (e) {
-      print("Error uploading to Supabase: $e");
-      return null;
+      print("Detailed Supabase Error: $e");
+      throw e.toString();
     }
   }
 }
