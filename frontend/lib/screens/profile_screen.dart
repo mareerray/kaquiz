@@ -17,6 +17,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _auth = AuthService();
   
   final TextEditingController _nameController = TextEditingController();
+  String? _avatarUrl;
   bool _isSaving = false;
 
   @override
@@ -24,6 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     // Default or current name from session (if we stored it)
     _nameController.text = _session.name ?? "Explorer";
+    _avatarUrl = _session.avatar ?? "";
   }
 
   @override
@@ -37,7 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     final success = await _apiService.updateUserProfile(
       _nameController.text.trim(),
-      "", // Avatar URL - leaving empty for now
+      _avatarUrl ?? "", // Avatar URL
     );
 
     if (success) {
@@ -93,11 +95,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              child: const CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.deepPurple,
-                child: Icon(Icons.person, size: 60, color: Colors.white),
-              ),
+              child: CircleAvatar(
+              radius: 60,
+              backgroundColor: Colors.deepPurple,
+              backgroundImage: (_avatarUrl ?? "").isNotEmpty
+                  ? NetworkImage(_avatarUrl!)
+                  : null,
+              child: (_avatarUrl ?? "").isEmpty
+                  ? const Icon(Icons.person, size: 60, color: Colors.white)
+                  : null,
+            ),
             ),
             
             const SizedBox(height: 32),
