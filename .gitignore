@@ -19,8 +19,18 @@ frontend/ios/.symlinks/
 frontend/ios/Pods/
 frontend/ios/Flutter/Flutter.framework
 frontend/ios/Flutter/Flutter.podspec
+frontend/ios/build/
+frontend/ios/Flutter/ephemeral/
 frontend/.env
 
 # ===== GENERAL =====
+# Mac system files
 .DS_Store
 *.log
+
+# Xcode personal settings - do not share
+ios/Runner.xcworkspace/xcuserdata/
+ios/Runner.xcodeproj/xcuserdata/
+ios/*.xcworkspace/xcuserdata/
+ios/Flutter/ephemeral/
+*.xcconfig
