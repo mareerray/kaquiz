@@ -11,10 +11,10 @@ class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
   @override
-  State<MainNavigation> createState() => _MainNavigationState();
+  State<MainNavigation> createState() => MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class MainNavigationState extends State<MainNavigation> {
   final ApiService _apiService = ApiService();
   int _selectedIndex = 0;
   int _pendingInvitesCount = 0;
@@ -64,6 +64,10 @@ class _MainNavigationState extends State<MainNavigation> {
         // but we'll let the next poll clear it properly if they accept/decline.
       }
     });
+  }
+
+  void switchTab(int index) {
+    _onItemTapped(index);
   }
 
   @override

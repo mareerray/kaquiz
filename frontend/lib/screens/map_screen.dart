@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -10,6 +11,8 @@ import 'search_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
+
+  static final ValueNotifier<LatLng?> focusLocationNotifier = ValueNotifier(null);
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -35,6 +38,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    MapScreen.focusLocationNotifier.addListener(_onFocusLocationChanged);
     _initializeLocation();
     
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
@@ -54,9 +58,22 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
+    MapScreen.focusLocationNotifier.removeListener(_onFocusLocationChanged);
     _refreshTimer?.cancel();
     _locationUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  void _onFocusLocationChanged() async {
+    final location = MapScreen.focusLocationNotifier.value;
+    if (location != null) {
+      final GoogleMapController controller = await _controller.future;
+      await controller.animateCamera(CameraUpdate.newCameraPosition(
+        CameraPosition(target: location, zoom: 16),
+      ));
+      // Reset so next tap on same friend still fires
+      MapScreen.focusLocationNotifier.value = null;
+    }
   }
 
   Future<void> _initializeLocation() async {
@@ -69,6 +86,7 @@ class _MapScreenState extends State<MapScreen> {
       });
       _goToCurrentPosition();
       _apiService.updateUserLocation(location.latitude, location.longitude);
+      // print('\n\n📍 ТВОИ ТЕКУЩИЕ КООРДИНАТЫ: ${location.latitude}, ${location.longitude} \n(Скопируй их в Simulator -> Features -> Location -> Custom Location)\n\n');
       _updateFriendsMarkers();
     } else {
       if (!mounted) return;
@@ -86,62 +104,98 @@ class _MapScreenState extends State<MapScreen> {
 
     final Set<Marker> newMarkers = {};
 
-    for (var friend in friendsData) {
-      final String name = friend['name'] ?? 'Unknown';
-      final double? lat = friend['lat'] != null ? (friend['lat'] as num).toDouble() : null;
-      final double? lng = friend['lng'] != null ? (friend['lng'] as num).toDouble() : null;
-      final String? avatarUrl = friend['avatar'];
-      final DateTime? lastSeen = friend['last_seen'] != null ? DateTime.parse(friend['last_seen']) : null;
-      
+    // Combine friends and the current user into a single list for grouping
+    final List<dynamic> allUsers = List.from(friendsData);
+    allUsers.add({
+      'id': 'me',
+      'name': _session.name ?? 'Me',
+      'lat': _currentPosition!.latitude,
+      'lng': _currentPosition!.longitude,
+      'avatar': _session.avatar,
+      'is_me': true,
+    });
+
+    // Group users by exact location to handle overlaps
+    final Map<String, List<dynamic>> locationGroups = {};
+    for (var user in allUsers) {
+      final double? lat = user['lat'] != null ? (user['lat'] as num).toDouble() : null;
+      final double? lng = user['lng'] != null ? (user['lng'] as num).toDouble() : null;
       if (lat == null || lng == null) continue;
+      
+      final String key = '${lat.toStringAsFixed(3)},${lng.toStringAsFixed(3)}';
+      locationGroups.putIfAbsent(key, () => []).add(user);
+    }
 
-      final String status = lastSeen != null ? _formatLastSeen(lastSeen) : 'Never seen';
+    for (var group in locationGroups.values) {
+      final int count = group.length;
+      if (count == 1) {
+        final user = group[0];
+        final bool isMe = user['is_me'] == true;
+        final String name = user['name'] ?? 'Unknown';
+        double lat = (user['lat'] as num).toDouble();
+        double lng = (user['lng'] as num).toDouble();
+        final String? avatarUrl = user['avatar'];
+        final DateTime? lastSeen = user['last_seen'] != null ? DateTime.parse(user['last_seen']) : null;
 
-      final icon = await MarkerUtils.getAvatarMarker(
-        url: avatarUrl,
-        name: name,
-        color: Colors.deepPurple,
-      );
+        final String status = isMe ? 'Your current location' : (lastSeen != null ? _formatLastSeen(lastSeen) : 'Never seen');
 
-      newMarkers.add(
-        Marker(
-          markerId: MarkerId('friend_${friend['id']}'),
-          position: LatLng(lat, lng),
-          icon: icon,
-          infoWindow: InfoWindow(
-            title: name,
-            snippet: status,
+        final icon = await MarkerUtils.getAvatarMarker(
+          url: avatarUrl,
+          name: name,
+          color: isMe ? Colors.blueAccent : Colors.deepPurple,
+          hasStar: isMe,
+        );
+
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId(isMe ? 'me_marker' : 'friend_${user['id']}'),
+            position: LatLng(lat, lng),
+            icon: icon,
+            zIndex: isMe ? 10.0 : 0.0,
+            infoWindow: InfoWindow(
+              title: isMe ? 'You' : name,
+              snippet: status,
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        // We have a cluster!
+        // We use the first user's exact coordinates for the whole cluster.
+        final firstUser = group[0];
+        double lat = (firstUser['lat'] as num).toDouble();
+        double lng = (firstUser['lng'] as num).toDouble();
+        
+        // Check if I am in this group
+        bool includesMe = group.any((u) => u['is_me'] == true);
+        
+        // Generate group marker using Canvas collage
+        final List<Map<String, dynamic>> typedGroup = List<Map<String, dynamic>>.from(group);
+        final icon = await MarkerUtils.getGroupAvatarMarker(typedGroup);
+        
+        // Create a summary title for the info window
+        List<String> names = group.take(3).map((u) => (u['name'] ?? 'Unknown').toString()).toList();
+        String title = names.join(', ');
+        if (group.length > 3) title += ' and ${group.length - 3} others';
+
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId('cluster_${lat}_$lng'),
+            position: LatLng(lat, lng),
+            icon: icon,
+            zIndex: includesMe ? 10.0 : 5.0,
+            infoWindow: InfoWindow(
+              title: '$count friends here',
+              snippet: title,
+            ),
+          ),
+        );
+      }
     }
 
     if (!mounted) return;
     setState(() {
       _friendsMarkers = newMarkers;
     });
-
-    // Add SELF marker with a STAR
-    final selfMarker = await MarkerUtils.getAvatarMarker(
-      url: _session.avatar,
-      name: _session.name ?? 'Me',
-      color: Colors.blueAccent,
-      hasStar: true,
-    );
-
-    if (mounted) {
-      setState(() {
-        _friendsMarkers.add(
-          Marker(
-            markerId: const MarkerId('me_marker'),
-            position: _currentPosition!,
-            icon: selfMarker,
-            zIndex: 10, // Keep self on top
-            infoWindow: const InfoWindow(title: 'You', snippet: 'Your current location'),
-          ),
-        );
-      });
-    }
   }
 
   String _formatLastSeen(DateTime lastSeen) {
@@ -182,14 +236,6 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
 
-          // Top Overlay (Search Bar)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 20,
-            right: 20,
-            child: _buildTopOverlay(),
-          ),
-
           // Floating Action Buttons (Moved up for Nav Bar)
           Positioned(
             bottom: 125, 
@@ -212,44 +258,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildTopOverlay() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            const Icon(Icons.search, color: Colors.black54),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const SearchScreen()),
-                  );
-                },
-                child: const Text(
-                  'Search friends...',
-                  style: TextStyle(color: Colors.black45, fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildMapActionButton({
     required IconData icon,

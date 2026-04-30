@@ -42,8 +42,12 @@ class LocationService {
     return true;
   }
 
+  bool _isFetching = false;
+
   /// Gets the current position of the user.
   Future<LatLng?> getCurrentLocation() async {
+    if (_isFetching) return null;
+    _isFetching = true;
     try {
       final hasPermission = await checkPermissions();
       if (!hasPermission) return null;
@@ -56,6 +60,8 @@ class LocationService {
     } catch (e) {
       debugPrint("Error getting location: $e");
       return null;
+    } finally {
+      _isFetching = false;
     }
   }
 

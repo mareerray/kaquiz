@@ -4,6 +4,9 @@ import 'search_screen.dart';
 import 'invites_screen.dart';
 import '../services/api_service.dart';
 import '../utils/ui_utils.dart';
+import 'map_screen.dart';
+import '../main_navigation.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -17,6 +20,22 @@ class _FriendsScreenState extends State<FriendsScreen> {
   bool _isLoading = true;
   List<dynamic> _friends = [];
   int _pendingCount = 0;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  List<dynamic> get filteredFriends {
+    if (_searchQuery.isEmpty) return _friends;
+    return _friends.where((friend) {
+      final name = (friend['name'] ?? '').toString().toLowerCase();
+      return name.contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -72,14 +91,15 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 child: Column(
                   children: [
                     _buildAddFriendHeader(),
+                    _buildLocalSearchBar(),
                     Expanded(
-                      child: _friends.isEmpty
+                      child: filteredFriends.isEmpty
                           ? _buildEmptyState()
                           : ListView.builder(
                               padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
-                              itemCount: _friends.length,
+                              itemCount: filteredFriends.length,
                               itemBuilder: (context, index) {
-                                return _buildFriendCard(_friends[index]);
+                                return _buildFriendCard(filteredFriends[index]);
                               },
                             ),
                     ),
@@ -127,6 +147,42 @@ class _FriendsScreenState extends State<FriendsScreen> {
               Spacer(),
               Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocalSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value;
+          });
+        },
+        decoration: InputDecoration(
+          hintText: 'Search in friends list...',
+          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, color: Colors.grey),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.8),
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide.none,
           ),
         ),
       ),
@@ -207,6 +263,16 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     ],
                   ),
                 ),
+                if (friend['lat'] != null && friend['lng'] != null)
+                  IconButton(
+                    icon: const Icon(Icons.location_on_outlined, color: Colors.blueAccent),
+                    onPressed: () {
+                      final double lat = (friend['lat'] as num).toDouble();
+                      final double lng = (friend['lng'] as num).toDouble();
+                      MapScreen.focusLocationNotifier.value = LatLng(lat, lng);
+                      context.findAncestorStateOfType<MainNavigationState>()?.switchTab(0);
+                    },
+                  ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                   onPressed: () => _confirmDelete(friend),
