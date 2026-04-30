@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
@@ -23,7 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   final _nameController = TextEditingController();
   File? _selectedImage;
-  bool _isLoading = false;
   bool _isSaving = false;
 
   @override
@@ -103,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         url,
       );
       if (success) {
-        setState(() => _avatarUrl = url); // show new avatar immediately
+        setState(() => _session.avatar = url); // show new avatar immediately
         _session.avatar = url;            // keep session in sync
         _session.name = _nameController.text.trim(); // also update name in session just in case
         if (mounted) {
