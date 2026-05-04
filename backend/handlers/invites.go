@@ -132,7 +132,6 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
 // -------------- DELETE/CANCEL INVITE ------------------
 func DeleteInvite(w http.ResponseWriter, r *http.Request) {
     userIDStr := r.Context().Value(middleware.UserIDKey).(string)
-    userID, _ := strconv.Atoi(userIDStr)
 
     vars := mux.Vars(r)
     inviteID, err := strconv.Atoi(vars["id"])
