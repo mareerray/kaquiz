@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
@@ -23,7 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   final _nameController = TextEditingController();
   File? _selectedImage;
-  bool _isLoading = false;
   bool _isSaving = false;
 
   @override
@@ -85,6 +85,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  Future<void> _pickAvatar() async {
+    setState(() => _isSaving = true);
+  
+    final supabaseUser = Supabase.instance.client.auth.currentUser;
+    if (supabaseUser == null) {
+      throw Exception('No Supabase user found');
+    }    
+    
+    final url = await _apiService.uploadAvatar(supabaseUser.id);
+
+    if (url != null) {
+      final success = await _apiService.updateUserProfile(
+        _nameController.text.trim(), // keep current name
+        url,
+      );
+      if (success) {
+        setState(() => _session.avatar = url); // show new avatar immediately
+        _session.avatar = url;            // keep session in sync
+        _session.name = _nameController.text.trim(); // also update name in session just in case
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Avatar updated! ✨'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+
+    setState(() => _isSaving = false);
   }
 
   void _handleLogout() async {
