@@ -29,6 +29,7 @@ class _MapScreenState extends State<MapScreen> {
   Set<Marker> _friendsMarkers = {};
   Timer? _refreshTimer;
   Timer? _locationUpdateTimer;
+  bool _isRefreshing = false;
 
   static const CameraPosition _kInitialPosition = CameraPosition(
     target: LatLng(50.4501, 30.5234), // Kyiv as default fallback
@@ -41,9 +42,11 @@ class _MapScreenState extends State<MapScreen> {
     MapScreen.focusLocationNotifier.addListener(_onFocusLocationChanged);
     _initializeLocation();
     
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_currentPosition != null) {
-        _updateFriendsMarkers();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (_currentPosition != null && !_isRefreshing) {
+        _isRefreshing = true;
+        await _updateFriendsMarkers();
+        _isRefreshing = false;
       }
     });
 
@@ -199,7 +202,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   String _formatLastSeen(DateTime lastSeen) {
-    final diff = DateTime.now().difference(lastSeen);
+    final now = DateTime.now().toUtc();
+    final diff = now.difference(lastSeen.toUtc());
     if (diff.inMinutes < 1) return 'Active just now';
     if (diff.inMinutes < 60) return 'Active ${diff.inMinutes}m ago';
     if (diff.inHours < 24) return 'Active ${diff.inHours}h ago';
@@ -222,6 +226,30 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'Kaquiz',
+                style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.w900, fontSize: 22),
+              ),
+              TextSpan(
+                text: ' | Map',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 20),
+              ),
+            ],
+          ),
+        ),
+        backgroundColor: Colors.white.withOpacity(0.5),
+        elevation: 0,
+        flexibleSpace: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+      ),
       body: Stack(
         children: [
           GoogleMap(

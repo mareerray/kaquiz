@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/ui_utils.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -124,7 +125,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _handleLogout() async {
+    // 1. Tell backend we are logging out (to set offline status)
+    await _apiService.logout();
+    
+    // 2. Clear local data
     await _session.clearSession();
+    
     if (mounted) {
       // Direct navigation is safer if routes are being problematic
       Navigator.pushAndRemoveUntil(
@@ -143,7 +149,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('My Profile', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+        title: RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'Kaquiz',
+                style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.w900, fontSize: 22),
+              ),
+              TextSpan(
+                text: ' | Profile',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 20),
+              ),
+            ],
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -158,7 +177,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 120, 24, 80),
+          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
           child: Column(
             children: [
               // Avatar Section with Glassmorphism
@@ -283,6 +302,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.logout, color: Colors.redAccent),
                 label: const Text("Log Out", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
               ),
+
+              const SizedBox(height: 60),
             ],
           ),
         ),

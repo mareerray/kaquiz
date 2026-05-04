@@ -52,7 +52,7 @@ func GetFriends(w http.ResponseWriter, r *http.Request) {
 
 		var lastSeenStr *string
 		if lastSeen != nil {
-			s := lastSeen.Format("2006-01-02 15:04:05")
+			s := lastSeen.Format(time.RFC3339)
 			lastSeenStr = &s
 		}
         friends = append(friends, map[string]interface{}{

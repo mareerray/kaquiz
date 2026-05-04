@@ -119,3 +119,21 @@ func SearchUsers(w http.ResponseWriter, r *http.Request) {
 		"email":  userEmail,
 	})
 }
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+    userID := r.Context().Value(middleware.UserIDKey).(string)
+
+    fmt.Println("🚪 User logging out:", userID)
+
+    // Set last_seen to a very old date (Unix epoch) to show as offline
+    _, err := db.DB.Exec(context.Background(),
+        `UPDATE users SET last_seen = '1970-01-01 00:00:00' WHERE id = $1`,
+        userID,
+    )
+    if err != nil {
+        fmt.Println("❌ Failed to update last_seen on logout:", err)
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"message": "Logged out successfully"})
+}

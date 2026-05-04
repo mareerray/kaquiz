@@ -91,7 +91,6 @@ class ApiService {
       );
       if (response.statusCode == 200) {
         final List<dynamic> allInvites = jsonDecode(response.body);
-        debugPrint("📩 INVITES FROM ${baseUrl}: Found ${allInvites.length} items. Body: ${response.body}");
         
         return allInvites.where((inv) {
           final senderId = (inv['sender_id'] ?? inv['senderId'])?.toString();
@@ -118,7 +117,6 @@ class ApiService {
       );
       if (response.statusCode == 200) {
         final List<dynamic> allInvites = jsonDecode(response.body);
-        debugPrint("📤 SENT FROM ${baseUrl}: Found ${allInvites.length} items. Body: ${response.body}");
         return allInvites.where((inv) {
           final senderId = (inv['sender_id'] ?? inv['senderId'] ?? inv['from'])?.toString();
           final myId = _session.userId?.toString();
@@ -135,7 +133,6 @@ class ApiService {
 
   Future<bool> sendFriendRequest(dynamic targetUserId) async {
     try {
-      debugPrint("🚀 ApiService: Sending request to user $targetUserId");
       final response = await http.post(
         Uri.parse('$baseUrl/api/invites/$targetUserId'),
         headers: {
@@ -143,15 +140,12 @@ class ApiService {
           'Authorization': 'Bearer ${_session.token}',
         },
       );
-      debugPrint("🚀 ApiService: Response status: ${response.statusCode}");
       // 200/201 = Created, 409 = Already exists (Conflict)
       if (response.statusCode == 409) {
-        debugPrint("🚀 ApiService: Request already exists (409 Conflict)");
         return true; 
       }
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      debugPrint("🚀 ApiService: ERROR sending request: $e");
       return false;
     }
   }
@@ -269,7 +263,6 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint("🟢 RAW USER DATA: $data"); // Let's see what's inside
         
         _session.name   = data['name'];
         _session.email  = data['email'];
@@ -280,11 +273,8 @@ class ApiService {
         if (newId != null) {
           _session.userId = newId;
         }
-        
-        debugPrint("🟢 User info loaded: ${_session.name} (ID: ${_session.userId})");
       }
     } catch (e) {
-      debugPrint("🔴 Failed to fetch user info: $e");
     }
   }
 
@@ -325,6 +315,20 @@ class ApiService {
       return [];
     } catch (e) {
       return [];
+    }
+  }
+  Future<bool> logout() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/logout'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_session.token}',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 }

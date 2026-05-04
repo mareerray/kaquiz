@@ -141,15 +141,33 @@ func DeleteInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("🗑️ Deleting invite:", inviteID, "requested by:", userID)
+    // Find the invite first to know who the other person is
+    var senderID, recipientID int
+    err = db.DB.QueryRow(context.Background(),
+        "SELECT sender_id, recipient_id FROM invites WHERE id = $1",
+        inviteID,
+    ).Scan(&senderID, &recipientID)
 
-    // Allow deletion if user is either the sender (cancel) or recipient (decline)
+    if err != nil {
+        http.Error(w, "Invite not found", http.StatusNotFound)
+        return
+    }
+
+    // Security check: only sender or recipient can delete
+    if strconv.Itoa(senderID) != userIDStr && strconv.Itoa(recipientID) != userIDStr {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Delete ALL invites between these two users to be safe
     result, err := db.DB.Exec(context.Background(),
-        `DELETE FROM invites WHERE id = $1 AND (sender_id = $2 OR recipient_id = $2)`,
-        inviteID, userID,
+        `DELETE FROM invites 
+         WHERE (sender_id = $1 AND recipient_id = $2)
+            OR (sender_id = $2 AND recipient_id = $1)`,
+        senderID, recipientID,
     )
     if err != nil || result.RowsAffected() == 0 {
-        http.Error(w, "Invite not found or not yours", http.StatusNotFound)
+        http.Error(w, "Failed to delete invites", http.StatusInternalServerError)
         return
     }
 
@@ -327,15 +345,33 @@ func DeclineInvite(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("❌ Declining invite:", inviteID, "by user:", recipientID)
+    // Find the invite first
+    var senderID, actualRecipientID int
+    err = db.DB.QueryRow(context.Background(),
+        "SELECT sender_id, recipient_id FROM invites WHERE id = $1",
+        inviteID,
+    ).Scan(&senderID, &actualRecipientID)
 
-    // Step 3: Delete the invite (only if it belongs to this user)
+    if err != nil {
+        http.Error(w, "Invite not found", http.StatusNotFound)
+        return
+    }
+
+    // Security check: only the recipient can decline
+    if actualRecipientID != recipientID {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Delete ALL invites between these two users
     result, err := db.DB.Exec(context.Background(),
-        `DELETE FROM invites WHERE id = $1 AND recipient_id = $2`,
-        inviteID, recipientID,
+        `DELETE FROM invites 
+         WHERE (sender_id = $1 AND recipient_id = $2)
+            OR (sender_id = $2 AND recipient_id = $1)`,
+        senderID, actualRecipientID,
     )
     if err != nil || result.RowsAffected() == 0 {
-        http.Error(w, "Invite not found", http.StatusNotFound)
+        http.Error(w, "Failed to decline invite", http.StatusInternalServerError)
         return
     }
 

@@ -24,6 +24,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   Timer? _pollTimer;
+  bool _isPolling = false;
 
   List<dynamic> get filteredFriends {
     if (_searchQuery.isEmpty) return _friends;
@@ -45,9 +46,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
     super.initState();
     _loadData();
     // Refresh friends list every 5 seconds silently
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!_isLoading) {
-        _loadData(showLoader: false);
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!_isLoading && !_isPolling) {
+        _isPolling = true;
+        await _loadData(showLoader: false);
+        _isPolling = false;
       }
     });
   }
@@ -84,7 +87,20 @@ class _FriendsScreenState extends State<FriendsScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: const Text('Friends List', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+          title: RichText(
+            text: const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Kaquiz',
+                  style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.w900, fontSize: 22),
+                ),
+                TextSpan(
+                  text: ' | Friends',
+                  style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 20),
+                ),
+              ],
+            ),
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.black87),
@@ -203,8 +219,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
   bool _isOnline(String? lastSeenStr) {
     if (lastSeenStr == null) return false;
     try {
-      final lastSeen = DateTime.parse(lastSeenStr);
-      return DateTime.now().difference(lastSeen).inMinutes < 5;
+      final lastSeen = DateTime.parse(lastSeenStr).toUtc();
+      final now = DateTime.now().toUtc();
+      return now.difference(lastSeen).inMinutes < 1;
     } catch (e) {
       return false;
     }

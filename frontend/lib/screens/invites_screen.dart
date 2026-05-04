@@ -103,7 +103,20 @@ class _InvitesScreenState extends State<InvitesScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
         appBar: AppBar(
-          title: const Text('Friend Requests', style: TextStyle(color: Colors.black87)),
+          title: RichText(
+            text: const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Kaquiz',
+                  style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.w900, fontSize: 22),
+                ),
+                TextSpan(
+                  text: ' | Invites',
+                  style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 20),
+                ),
+              ],
+            ),
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.black87),
@@ -147,12 +160,15 @@ class _InvitesScreenState extends State<InvitesScreen> {
   }
 
   Widget _buildInviteCard(dynamic invite, {required bool isOutgoing}) {
-    final String name = isOutgoing 
-        ? (invite['receiver_name'] ?? invite['receiverName'] ?? 'Unknown') 
-        : (invite['name'] ?? invite['sender_name'] ?? invite['senderName'] ?? 'Unknown');
-    final String? avatar = isOutgoing 
-        ? (invite['receiver_avatar'] ?? invite['receiverAvatar']) 
-        : (invite['avatar'] ?? invite['sender_avatar'] ?? invite['senderAvatar']);
+    final String name = invite['name'] ?? 
+                        invite['receiver_name'] ?? 
+                        invite['receiverName'] ?? 
+                        invite['sender_name'] ?? 
+                        'Unknown';
+    final String? avatar = invite['avatar'] ?? 
+                          invite['receiver_avatar'] ?? 
+                          invite['receiverAvatar'] ?? 
+                          invite['sender_avatar'];
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

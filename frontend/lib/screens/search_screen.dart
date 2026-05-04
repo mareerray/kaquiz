@@ -48,8 +48,6 @@ class _SearchScreenState extends State<SearchScreen> {
       
       if (mounted) {
         final foundId = _foundUser?['id']?.toString();
-        debugPrint("🔍 SEARCH DEBUG: My ID = ${SessionService().userId}, Found ID = $foundId");
-        debugPrint("🔍 SEARCH DEBUG: Sent Count = ${_sentInvites.length}, Incoming Count = ${_incomingInvites.length}");
 
         if (foundId != null) {
           _isAlreadyFriend = _myFriends.any((f) => f['id']?.toString() == foundId);
@@ -63,8 +61,6 @@ class _SearchScreenState extends State<SearchScreen> {
             final sid = (inv['sender_id'] ?? inv['senderId'])?.toString();
             return sid == foundId;
           });
-          
-          debugPrint("🔍 RESULT: Friend=$_isAlreadyFriend, Sent=$_isRequestSent, Incoming=$_isIncomingRequest");
           
           if (_isAlreadyFriend) _stopPolling();
         }
@@ -338,7 +334,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     // Find the invite ID to cancel
                     final invite = _sentInvites.firstWhere(
                       (inv) {
-                        final receiverId = (inv['receiver_id'] ?? inv['receiverId'])?.toString();
+                        final receiverId = (inv['receiver_id'] ?? inv['receiverId'] ?? inv['recipient_id'])?.toString();
                         return receiverId == user['id']?.toString();
                       },
                       orElse: () => null,

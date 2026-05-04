@@ -88,6 +88,8 @@
 	<key>MAPS_API_KEY</key>
 		<string>$(MAPS_API_KEY)</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-		<string>This app needs access to your photo library so you can choose a profile avatar.</string>
+	<string>This app needs access to your photo library so you can choose a profile avatar.</string>
+	<key>FLTEnableImpeller</key>
+	<false/>
 </dict>
 </plist>
