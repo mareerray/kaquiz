@@ -91,7 +91,6 @@ class ApiService {
       );
       if (response.statusCode == 200) {
         final List<dynamic> allInvites = jsonDecode(response.body);
-        debugPrint("📩 INVITES DEBUG (/api/invites): Found ${allInvites.length} items. Raw: $allInvites");
         
         return allInvites.where((inv) {
           final receiverId = (inv['receiver_id'] ?? inv['receiverId'] ?? inv['user_id'] ?? inv['to'])?.toString();
@@ -107,39 +106,22 @@ class ApiService {
 
   Future<List<dynamic>> getSentInvites() async {
     try {
-      // Let's try BOTH common endpoints to find where sent invites are
       final response = await http.get(
-        Uri.parse('$baseUrl/api/invites/sent'), // Trying specialized endpoint first
+        Uri.parse('$baseUrl/api/invites'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${_session.token}',
         },
       );
-      
-      List<dynamic> allInvites = [];
       if (response.statusCode == 200) {
-        allInvites = jsonDecode(response.body);
-        debugPrint("📤 SENT DEBUG (/api/invites/sent): Found ${allInvites.length} items.");
-      } else {
-        // Fallback to main endpoint
-        final resp2 = await http.get(
-          Uri.parse('$baseUrl/api/invites'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${_session.token}',
-          },
-        );
-        if (resp2.statusCode == 200) {
-          allInvites = jsonDecode(resp2.body);
-          debugPrint("📤 SENT DEBUG (fallback to /api/invites): Found ${allInvites.length} items.");
-        }
+        final List<dynamic> allInvites = jsonDecode(response.body);
+        return allInvites.where((inv) {
+          final senderId = (inv['sender_id'] ?? inv['senderId'] ?? inv['from'])?.toString();
+          final myId = _session.userId?.toString();
+          return senderId == myId;
+        }).toList();
       }
-      
-      return allInvites.where((inv) {
-        final senderId = (inv['sender_id'] ?? inv['senderId'] ?? inv['from'])?.toString();
-        final myId = _session.userId?.toString();
-        return senderId == myId;
-      }).toList();
+      return [];
     } catch (e) {
       return [];
     }
