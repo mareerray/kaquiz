@@ -84,7 +84,7 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
     // We use LEFT JOIN to ensure we see the invite even if user data is missing
     // and CASE to always get the OTHER person's info
     rows, err := db.DB.Query(context.Background(),
-        `SELECT i.id, i.sender_id, i.recipient_id, i.status, i.created_at,
+        `SELECT i.id, i.sender_id, i.recipient_id, i.created_at,
                 other.name, other.avatar
          FROM invites i
          JOIN users other ON (CASE WHEN i.sender_id = $1 THEN i.recipient_id ELSE i.sender_id END) = other.id
@@ -101,10 +101,10 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
     var invites []map[string]interface{}
     for rows.Next() {
         var id, senderID, recipientID int
-        var status, name, avatar string
+        var name, avatar string
         var createdAt time.Time
 
-        err := rows.Scan(&id, &senderID, &recipientID, &status, &createdAt, &name, &avatar)
+        err := rows.Scan(&id, &senderID, &recipientID, &createdAt, &name, &avatar)
         if err != nil {
             fmt.Println("❌ Scan error:", err) 
             continue
@@ -114,9 +114,9 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
             "id":           id,
             "sender_id":    senderID,
             "recipient_id": recipientID,
-            "status":       status,
-            "name":         name,   // This is now always the OTHER person
-            "avatar":       avatar, // This is now always the OTHER person
+            "status":       "pending", // Default to pending since column doesn't exist
+            "name":         name,   
+            "avatar":       avatar, 
             "created_at":   createdAt.Format("2006-01-02 15:04:05"),
         })
     }
