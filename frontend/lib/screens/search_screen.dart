@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../utils/ui_utils.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -16,13 +17,16 @@ class _SearchScreenState extends State<SearchScreen> {
   
   Map<String, dynamic>? _foundUser;
   bool _isSearching = false;
+  bool _isActionLoading = false;
   bool _isRequestSent = false; 
   bool _isAlreadyFriend = false; 
+  bool _isIncomingRequest = false;
 
   Timer? _debounce;
   Timer? _statusPollingTimer; // Timer for checking acceptance status
   List<dynamic> _myFriends = [];
   List<dynamic> _sentInvites = [];
+  List<dynamic> _incomingInvites = [];
 
   @override
   void initState() {
@@ -34,26 +38,38 @@ class _SearchScreenState extends State<SearchScreen> {
     final results = await Future.wait([
       _apiService.getFriends(),
       _apiService.getSentInvites(),
+      _apiService.getPendingInvites(),
     ]);
     
     if (mounted) {
-      setState(() {
-        _myFriends = results[0];
-        _sentInvites = results[1];
-        
-        // If we found a user and they are now in the friend list, update state
-        if (_foundUser != null) {
-          _isAlreadyFriend = _myFriends.any((f) => f['id'] == _foundUser!['id']);
+      _myFriends = results[0];
+      _sentInvites = results[1];
+      _incomingInvites = results[2];
+      
+      if (mounted) {
+        final foundId = _foundUser?['id']?.toString();
+        debugPrint("🔍 SEARCH DEBUG: My ID = ${SessionService().userId}, Found ID = $foundId");
+        debugPrint("🔍 SEARCH DEBUG: Sent Count = ${_sentInvites.length}, Incoming Count = ${_incomingInvites.length}");
+
+        if (foundId != null) {
+          _isAlreadyFriend = _myFriends.any((f) => f['id']?.toString() == foundId);
+          
           _isRequestSent = _sentInvites.any((inv) {
-            final receiverId = (inv['receiver_id'] ?? inv['receiverId'])?.toString();
-            return receiverId == _foundUser!['id']?.toString();
+            final rid = (inv['receiver_id'] ?? inv['receiverId'] ?? inv['recipient_id'])?.toString();
+            return rid == foundId;
+          });
+
+          _isIncomingRequest = _incomingInvites.any((inv) {
+            final sid = (inv['sender_id'] ?? inv['senderId'])?.toString();
+            return sid == foundId;
           });
           
-          if (_isAlreadyFriend) {
-            _stopPolling();
-          }
+          debugPrint("🔍 RESULT: Friend=$_isAlreadyFriend, Sent=$_isRequestSent, Incoming=$_isIncomingRequest");
+          
+          if (_isAlreadyFriend) _stopPolling();
         }
-      });
+        setState(() {});
+      }
     }
   }
 
@@ -90,6 +106,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _isSearching = true;
       _isRequestSent = false;
       _isAlreadyFriend = false;
+      _isIncomingRequest = false;
     });
 
     try {
@@ -103,9 +120,16 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() {
           _foundUser = user;
           _isAlreadyFriend = friend;
+          final foundId = user?['id']?.toString();
+          
           _isRequestSent = _sentInvites.any((inv) {
-            final receiverId = (inv['receiver_id'] ?? inv['receiverId'])?.toString();
-            return receiverId == user?['id']?.toString();
+            final receiverId = (inv['receiver_id'] ?? inv['receiverId'] ?? inv['recipient_id'])?.toString();
+            return receiverId == foundId;
+          });
+
+          _isIncomingRequest = _incomingInvites.any((inv) {
+            final senderId = (inv['sender_id'] ?? inv['senderId'])?.toString();
+            return senderId == foundId;
           });
         });
         
@@ -131,6 +155,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _foundUser = null;
       _isRequestSent = false;
       _isAlreadyFriend = false;
+      _isIncomingRequest = false;
     });
   }
 
@@ -239,42 +264,70 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: (_isRequestSent || _isAlreadyFriend) 
+                  onPressed: (_isAlreadyFriend || _isActionLoading) 
                     ? null 
                     : () async {
-                        debugPrint("🔘 Button pressed! User ID: ${user['id']}");
-                        if (user['id'] == null) {
-                          debugPrint("❌ ABORT: user['id'] is NULL!");
+                        setState(() => _isActionLoading = true);
+                        
+                        if (_isIncomingRequest) {
+                          // If there's an incoming request, accept it!
+                          final invite = _incomingInvites.firstWhere(
+                            (inv) => inv['sender_id']?.toString() == user['id']?.toString(),
+                          );
+                          final success = await _apiService.respondToInvite(invite['id'], true);
+                          if (mounted && success) {
+                            UIUtils.showSuccess(context, 'Friend request accepted!');
+                            _loadFriends();
+                          }
+                          setState(() => _isActionLoading = false);
                           return;
                         }
-                        
+
+                        if (_isRequestSent) {
+                          // If it's already sent, clicking again cancels it
+                          final invite = _sentInvites.firstWhere(
+                            (inv) {
+                              final receiverId = (inv['receiver_id'] ?? inv['receiverId'] ?? inv['recipient_id'])?.toString();
+                              return receiverId == user['id']?.toString();
+                            },
+                            orElse: () => null,
+                          );
+                          
+                          if (invite != null) {
+                            final success = await _apiService.cancelInvite(invite['id']);
+                            if (mounted && success) {
+                              UIUtils.showSuccess(context, 'Request cancelled.');
+                              _loadFriends();
+                            }
+                          }
+                          setState(() => _isActionLoading = false);
+                          return;
+                        }
+
+                        // Otherwise, send a new request
                         final success = await _apiService.sendFriendRequest(user['id']);
-                        debugPrint("🔘 Request success: $success");
-                        
                         if (mounted && success) {
-                          setState(() {
-                            _isRequestSent = true;
-                          });
-                          _startPolling(); // Start watching for acceptance
+                          _isRequestSent = true;
+                          _loadFriends();
                           UIUtils.showSuccess(context, 'Request sent!');
                         } else if (mounted) {
                           UIUtils.showError(context, 'Failed to send request.');
                         }
+                        setState(() => _isActionLoading = false);
                       },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isAlreadyFriend 
-                        ? Colors.green.shade400 
-                        : (_isRequestSent ? Colors.orange.shade300 : Colors.deepPurple),
+                    backgroundColor: _isAlreadyFriend ? Colors.green : (_isIncomingRequest ? Colors.purple : (_isRequestSent ? Colors.orange : Colors.blue)),
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: _isAlreadyFriend ? Colors.green.shade300 : Colors.grey.shade300,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: Text(
-                    _isAlreadyFriend 
-                        ? 'Accepted!' 
-                        : (_isRequestSent ? 'Pending...' : 'Add Friend')
-                  ),
+                  child: _isActionLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text(
+                        _isAlreadyFriend 
+                            ? 'Accepted!' 
+                            : (_isIncomingRequest ? 'Accept Invite' : (_isRequestSent ? 'Pending...' : 'Add Friend'))
+                      ),
                 ),
               ),
               if (_isRequestSent && !_isAlreadyFriend) ...[

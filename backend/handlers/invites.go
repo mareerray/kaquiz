@@ -81,15 +81,14 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
     fmt.Println("📬 Getting all invites for user:", userID)
 
     // Find all invites where this user is either sender or recipient
+    // We use LEFT JOIN to ensure we see the invite even if user data is missing
+    // and CASE to always get the OTHER person's info
     rows, err := db.DB.Query(context.Background(),
-        `SELECT i.id, i.sender_id, i.recipient_id, 
-                u_sender.name as sender_name, u_sender.avatar as sender_avatar,
-                u_recip.name as receiver_name, u_recip.avatar as receiver_avatar,
-                i.created_at 
-            FROM invites i
-            JOIN users u_sender ON u_sender.id = i.sender_id
-            JOIN users u_recip ON u_recip.id = i.recipient_id
-            WHERE i.recipient_id = $1 OR i.sender_id = $1`,
+        `SELECT i.id, i.sender_id, i.recipient_id, i.status, i.created_at,
+                other.name, other.avatar
+         FROM invites i
+         JOIN users other ON (CASE WHEN i.sender_id = $1 THEN i.recipient_id ELSE i.sender_id END) = other.id
+         WHERE i.sender_id = $1 OR i.recipient_id = $1`,
         userID,
     )
     if err != nil {
@@ -102,26 +101,23 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
     var invites []map[string]interface{}
     for rows.Next() {
         var id, senderID, recipientID int
-        var sName, sAvatar, rName, rAvatar string
+        var status, name, avatar string
         var createdAt time.Time
 
-        err := rows.Scan(&id, &senderID, &recipientID, &sName, &sAvatar, &rName, &rAvatar, &createdAt)
+        err := rows.Scan(&id, &senderID, &recipientID, &status, &createdAt, &name, &avatar)
         if err != nil {
             fmt.Println("❌ Scan error:", err) 
             continue
         }
 
         invites = append(invites, map[string]interface{}{
-            "id":               id,
-            "sender_id":        senderID,
-            "recipient_id":     recipientID,
-            "name":             sName, // for backward compatibility in Incoming list
-            "avatar":           sAvatar,
-            "sender_name":      sName,
-            "sender_avatar":    sAvatar,
-            "receiver_name":    rName,
-            "receiver_avatar":  rAvatar,
-            "created_at":       createdAt.Format("2006-01-02 15:04:05"),
+            "id":           id,
+            "sender_id":    senderID,
+            "recipient_id": recipientID,
+            "status":       status,
+            "name":         name,   // This is now always the OTHER person
+            "avatar":       avatar, // This is now always the OTHER person
+            "created_at":   createdAt.Format("2006-01-02 15:04:05"),
         })
     }
 

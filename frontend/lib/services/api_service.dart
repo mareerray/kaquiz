@@ -91,11 +91,14 @@ class ApiService {
       );
       if (response.statusCode == 200) {
         final List<dynamic> allInvites = jsonDecode(response.body);
+        debugPrint("📩 INVITES FROM ${baseUrl}: Found ${allInvites.length} items. Body: ${response.body}");
         
         return allInvites.where((inv) {
-          final receiverId = (inv['receiver_id'] ?? inv['receiverId'] ?? inv['user_id'] ?? inv['to'])?.toString();
+          final senderId = (inv['sender_id'] ?? inv['senderId'])?.toString();
           final myId = _session.userId?.toString();
-          return receiverId == myId;
+          
+          // If we are NOT the sender, it MUST be an incoming invite (pending for us)
+          return senderId != myId;
         }).toList();
       }
       return [];
@@ -115,9 +118,12 @@ class ApiService {
       );
       if (response.statusCode == 200) {
         final List<dynamic> allInvites = jsonDecode(response.body);
+        debugPrint("📤 SENT FROM ${baseUrl}: Found ${allInvites.length} items. Body: ${response.body}");
         return allInvites.where((inv) {
           final senderId = (inv['sender_id'] ?? inv['senderId'] ?? inv['from'])?.toString();
           final myId = _session.userId?.toString();
+          
+          // If we ARE the sender, it's an outgoing invite (sent by us)
           return senderId == myId;
         }).toList();
       }

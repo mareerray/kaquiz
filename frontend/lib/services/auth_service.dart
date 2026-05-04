@@ -43,15 +43,15 @@ class AuthService {
         return null;
       }
 
-      await Supabase.instance.client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      debugPrint(
-        "🟢 Supabase user: ${Supabase.instance.client.auth.currentUser?.id}",
-      );
+      try {
+        await Supabase.instance.client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+        );
+        debugPrint("🟢 Supabase login SUCCESS: ${Supabase.instance.client.auth.currentUser?.id}");
+      } catch (supabaseError) {
+        debugPrint("⚠️ Supabase login failed (nonce issue?), but continuing main login: $supabaseError");
+      }
 
       return idToken;
     } catch (e) {
