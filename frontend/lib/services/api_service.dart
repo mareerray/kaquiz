@@ -46,7 +46,10 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        // Normalize the ID field so the UI always sees 'id'
+        data['id'] = data['id'] ?? data['userId'] ?? data['user_id'] ?? data['ID'];
+        return data;
       }
       return null;
     } catch (e) {
@@ -84,7 +87,14 @@ class ApiService {
         },
       );
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final List<dynamic> allInvites = jsonDecode(response.body);
+        debugPrint("📩 INVITES DEBUG (/api/invites): Found ${allInvites.length} items. Raw: $allInvites");
+        
+        return allInvites.where((inv) {
+          final receiverId = (inv['receiver_id'] ?? inv['receiverId'] ?? inv['user_id'] ?? inv['to'])?.toString();
+          final myId = _session.userId?.toString();
+          return receiverId == myId;
+        }).toList();
       }
       return [];
     } catch (e) {
@@ -92,8 +102,49 @@ class ApiService {
     }
   }
 
-  Future<bool> sendFriendRequest(int targetUserId) async {
+  Future<List<dynamic>> getSentInvites() async {
     try {
+      // Let's try BOTH common endpoints to find where sent invites are
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/invites/sent'), // Trying specialized endpoint first
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_session.token}',
+        },
+      );
+      
+      List<dynamic> allInvites = [];
+      if (response.statusCode == 200) {
+        allInvites = jsonDecode(response.body);
+        debugPrint("📤 SENT DEBUG (/api/invites/sent): Found ${allInvites.length} items.");
+      } else {
+        // Fallback to main endpoint
+        final resp2 = await http.get(
+          Uri.parse('$baseUrl/api/invites'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${_session.token}',
+          },
+        );
+        if (resp2.statusCode == 200) {
+          allInvites = jsonDecode(resp2.body);
+          debugPrint("📤 SENT DEBUG (fallback to /api/invites): Found ${allInvites.length} items.");
+        }
+      }
+      
+      return allInvites.where((inv) {
+        final senderId = (inv['sender_id'] ?? inv['senderId'] ?? inv['from'])?.toString();
+        final myId = _session.userId?.toString();
+        return senderId == myId;
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> sendFriendRequest(dynamic targetUserId) async {
+    try {
+      debugPrint("🚀 ApiService: Sending request to user $targetUserId");
       final response = await http.post(
         Uri.parse('$baseUrl/api/invites/$targetUserId'),
         headers: {
@@ -101,8 +152,15 @@ class ApiService {
           'Authorization': 'Bearer ${_session.token}',
         },
       );
+      debugPrint("🚀 ApiService: Response status: ${response.statusCode}");
+      // 200/201 = Created, 409 = Already exists (Conflict)
+      if (response.statusCode == 409) {
+        debugPrint("🚀 ApiService: Request already exists (409 Conflict)");
+        return true; 
+      }
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
+      debugPrint("🚀 ApiService: ERROR sending request: $e");
       return false;
     }
   }
@@ -112,6 +170,21 @@ class ApiService {
       final action = accept ? 'accept' : 'decline';
       final response = await http.post(
         Uri.parse('$baseUrl/api/invites/$inviteId/$action'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_session.token}',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> cancelInvite(int inviteId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/invites/$inviteId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${_session.token}',
@@ -166,10 +239,19 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        debugPrint("🟢 RAW USER DATA: $data"); // Let's see what's inside
+        
         _session.name   = data['name'];
         _session.email  = data['email'];
         _session.avatar = data['avatar'];
-        debugPrint("🟢 User info loaded: ${_session.name}");
+        
+        // Only update userId if it's actually in the response
+        final newId = data['id'] ?? data['userId'] ?? data['user_id'] ?? data['ID'];
+        if (newId != null) {
+          _session.userId = newId;
+        }
+        
+        debugPrint("🟢 User info loaded: ${_session.name} (ID: ${_session.userId})");
       }
     } catch (e) {
       debugPrint("🔴 Failed to fetch user info: $e");

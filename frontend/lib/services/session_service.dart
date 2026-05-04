@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 class SessionService {
@@ -10,11 +11,27 @@ class SessionService {
   String? name;    
   String? email;   
   String? avatar;  
+  int? userId;  
 
-  /// Saves the token in memory for the current session
+  /// Saves the token in memory for the current session and extracts userId
   void setToken(String token) {
     _jwtToken = token;
-    debugPrint("🔑 SessionService: Token saved.");
+    try {
+      final parts = token.split('.');
+      if (parts.length == 3) {
+        String payload = parts[1];
+        // Add padding if needed
+        while (payload.length % 4 != 0) {
+          payload += '=';
+        }
+        final String decoded = utf8.decode(base64Url.decode(payload));
+        final Map<String, dynamic> data = jsonDecode(decoded);
+        userId = data['user_id'] ?? data['id'] ?? data['sub'];
+        debugPrint("🔑 SessionService: Token saved. Extracted userId: $userId");
+      }
+    } catch (e) {
+      debugPrint("⚠️ SessionService: Could not decode token: $e");
+    }
   }
 
   /// Returns the current session token
@@ -27,6 +44,7 @@ class SessionService {
     name = null;
     email = null;
     avatar = null;
+    userId = null;
     debugPrint("🔑 SessionService: Session cleared.");
   }
 

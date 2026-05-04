@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -11,22 +12,62 @@ class InvitesScreen extends StatefulWidget {
 class _InvitesScreenState extends State<InvitesScreen> {
   final ApiService _apiService = ApiService();
   bool _isLoading = true;
-  List<dynamic> _invites = [];
+  List<dynamic> _incomingInvites = [];
+  List<dynamic> _sentInvites = [];
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadInvites();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!_isLoading) {
+        _loadInvites(showLoader: false);
+      }
+    });
   }
 
-  Future<void> _loadInvites() async {
-    setState(() => _isLoading = true);
-    final invites = await _apiService.getPendingInvites();
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadInvites({bool showLoader = true}) async {
+    if (showLoader) {
+      setState(() => _isLoading = true);
+    }
+    final results = await Future.wait([
+      _apiService.getPendingInvites(),
+      _apiService.getSentInvites(),
+    ]);
+    
     if (mounted) {
       setState(() {
-        _invites = invites;
+        _incomingInvites = results[0];
+        _sentInvites = results[1];
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _handleCancel(int id) async {
+    setState(() => _isLoading = true);
+    final success = await _apiService.cancelInvite(id);
+    if (mounted) {
+      if (success) {
+        setState(() {
+          _sentInvites.removeWhere((inv) => (inv['id'] ?? inv['id']) == id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Request cancelled.'), backgroundColor: Colors.orange),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to cancel request.'), backgroundColor: Colors.redAccent),
+        );
+      }
+      setState(() => _isLoading = false);
     }
   }
 
@@ -38,7 +79,7 @@ class _InvitesScreenState extends State<InvitesScreen> {
     if (mounted) {
       if (success) {
         setState(() {
-          _invites.removeWhere((invite) => invite['id'] == id);
+          _incomingInvites.removeWhere((invite) => (invite['id'] ?? invite['id']) == id);
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -57,35 +98,62 @@ class _InvitesScreenState extends State<InvitesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: const Text('Friend Requests', style: TextStyle(color: Colors.black87)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInvites,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F7FA),
+        appBar: AppBar(
+          title: const Text('Friend Requests', style: TextStyle(color: Colors.black87)),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.black87),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadInvites,
+            ),
+          ],
+          bottom: const TabBar(
+            labelColor: Colors.deepPurple,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Colors.deepPurple,
+            tabs: [
+              Tab(text: 'Incoming'),
+              Tab(text: 'Outgoing'),
+            ],
           ),
-        ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                children: [
+                  _buildInvitesList(_incomingInvites, isOutgoing: false),
+                  _buildInvitesList(_sentInvites, isOutgoing: true),
+                ],
+              ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _invites.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(20),
-                  itemCount: _invites.length,
-                  itemBuilder: (context, index) {
-                    return _buildInviteCard(_invites[index]);
-                  },
-                ),
     );
   }
 
-  Widget _buildInviteCard(dynamic invite) {
+  Widget _buildInvitesList(List<dynamic> list, {required bool isOutgoing}) {
+    if (list.isEmpty) return _buildEmptyState(isOutgoing);
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        return _buildInviteCard(list[index], isOutgoing: isOutgoing);
+      },
+    );
+  }
+
+  Widget _buildInviteCard(dynamic invite, {required bool isOutgoing}) {
+    final String name = isOutgoing 
+        ? (invite['receiver_name'] ?? invite['receiverName'] ?? 'Unknown') 
+        : (invite['name'] ?? invite['sender_name'] ?? invite['senderName'] ?? 'Unknown');
+    final String? avatar = isOutgoing 
+        ? (invite['receiver_avatar'] ?? invite['receiverAvatar']) 
+        : (invite['avatar'] ?? invite['sender_avatar'] ?? invite['senderAvatar']);
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -106,36 +174,30 @@ class _InvitesScreenState extends State<InvitesScreen> {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: Colors.orange.shade100,
-                backgroundImage: (invite['avatar'] != null && invite['avatar'].toString().isNotEmpty)
-                    ? NetworkImage(invite['avatar'])
+                backgroundColor: isOutgoing ? Colors.blue.shade100 : Colors.orange.shade100,
+                backgroundImage: (avatar != null && avatar.toString().isNotEmpty)
+                    ? NetworkImage(avatar)
                     : null,
-                child: (invite['avatar'] == null || invite['avatar'].toString().isEmpty)
+                child: (avatar == null || avatar.toString().isEmpty)
                     ? Text(
-                        invite['name']?[0]?.toUpperCase() ?? '?',
-                        style: const TextStyle(color: Colors.orange),
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: TextStyle(color: isOutgoing ? Colors.blue : Colors.orange),
                       )
                     : null,
               ),
-              // CircleAvatar(
-              //   radius: 24,
-              //   backgroundColor: Colors.orange.shade100,
-              //   child: Text(
-              //     invite['name']?[0]?.toUpperCase() ?? '?',
-              //     style: const TextStyle(color: Colors.orange),
-              //   ),
-              // ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      invite['name'] ?? 'Unknown',
+                      name,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     Text(
-                      'Requested on ${invite['created_at']?.split(' ')[0] ?? ''}',
+                      isOutgoing 
+                        ? 'Sent on ${invite['created_at']?.split(' ')[0] ?? ''}'
+                        : 'Requested on ${invite['created_at']?.split(' ')[0] ?? ''}',
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                     ),
                   ],
@@ -145,41 +207,57 @@ class _InvitesScreenState extends State<InvitesScreen> {
           ),
           const SizedBox(height: 16),
           const Divider(),
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () => _handleAction(invite['id'], false),
-                  child: const Text('Decline', style: TextStyle(color: Colors.grey)),
-                ),
+          if (isOutgoing)
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => _handleCancel(invite['id']),
+                child: const Text('Cancel Request', style: TextStyle(color: Colors.redAccent)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => _handleAction(invite['id'], true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => _handleAction(invite['id'], false),
+                    child: const Text('Decline', style: TextStyle(color: Colors.grey)),
                   ),
-                  child: const Text('Accept'),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _handleAction(invite['id'], true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Accept'),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isOutgoing) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.mail_outline, size: 80, color: Colors.grey.shade300),
+          Icon(
+            isOutgoing ? Icons.send_outlined : Icons.mail_outline, 
+            size: 80, 
+            color: Colors.grey.shade300
+          ),
           const SizedBox(height: 16),
-          const Text('No pending requests. Why not find someone?', style: TextStyle(color: Colors.grey)),
+          Text(
+            isOutgoing ? 'No sent requests.' : 'No pending requests.', 
+            style: const TextStyle(color: Colors.grey)
+          ),
         ],
       ),
     );

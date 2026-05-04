@@ -41,7 +41,7 @@ class _MapScreenState extends State<MapScreen> {
     MapScreen.focusLocationNotifier.addListener(_onFocusLocationChanged);
     _initializeLocation();
     
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_currentPosition != null) {
         _updateFriendsMarkers();
       }

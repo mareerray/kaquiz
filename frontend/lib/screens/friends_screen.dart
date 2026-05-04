@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'search_screen.dart';
@@ -22,6 +23,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   int _pendingCount = 0;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  Timer? _pollTimer;
 
   List<dynamic> get filteredFriends {
     if (_searchQuery.isEmpty) return _friends;
@@ -33,6 +35,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -41,10 +44,18 @@ class _FriendsScreenState extends State<FriendsScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // Refresh friends list every 5 seconds silently
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!_isLoading) {
+        _loadData(showLoader: false);
+      }
+    });
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadData({bool showLoader = true}) async {
+    if (showLoader) {
+      setState(() => _isLoading = true);
+    }
     
     final results = await Future.wait([
       _apiService.getFriends(),

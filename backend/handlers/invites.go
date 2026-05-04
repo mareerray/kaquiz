@@ -69,9 +69,8 @@ func SendInvite(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-// -------------- GET INVITES ------------------
+// -------------- GET INVITES (Incoming & Outgoing) ------------------
 func GetInvites(w http.ResponseWriter, r *http.Request) {
-    // Step 1: Who is asking? Get their ID from JWT
     userIDStr := r.Context().Value(middleware.UserIDKey).(string)
     userID, err := strconv.Atoi(userIDStr)
     if err != nil {
@@ -79,14 +78,18 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("📬 Getting invites for user:", userID)
+    fmt.Println("📬 Getting all invites for user:", userID)
 
-    // Step 2: Find all invites where this user is the recipient
+    // Find all invites where this user is either sender or recipient
     rows, err := db.DB.Query(context.Background(),
-        `SELECT i.id, i.sender_id, u.name, u.avatar, i.created_at 
+        `SELECT i.id, i.sender_id, i.recipient_id, 
+                u_sender.name as sender_name, u_sender.avatar as sender_avatar,
+                u_recip.name as receiver_name, u_recip.avatar as receiver_avatar,
+                i.created_at 
             FROM invites i
-            JOIN users u ON u.id = i.sender_id
-            WHERE i.recipient_id = $1`,
+            JOIN users u_sender ON u_sender.id = i.sender_id
+            JOIN users u_recip ON u_recip.id = i.recipient_id
+            WHERE i.recipient_id = $1 OR i.sender_id = $1`,
         userID,
     )
     if err != nil {
@@ -96,37 +99,66 @@ func GetInvites(w http.ResponseWriter, r *http.Request) {
     }
     defer rows.Close()
 
-    // Step 3: Build the list
     var invites []map[string]interface{}
     for rows.Next() {
-        var id, senderID int
-        var name, avatar string
+        var id, senderID, recipientID int
+        var sName, sAvatar, rName, rAvatar string
         var createdAt time.Time
 
-        err := rows.Scan(&id, &senderID, &name, &avatar, &createdAt)
+        err := rows.Scan(&id, &senderID, &recipientID, &sName, &sAvatar, &rName, &rAvatar, &createdAt)
         if err != nil {
             fmt.Println("❌ Scan error:", err) 
             continue
         }
 
         invites = append(invites, map[string]interface{}{
-            "id":         id,
-            "sender_id":  senderID,
-            "name":       name,
-            "avatar":     avatar,
-            "created_at": createdAt.Format("2006-01-02 15:04:05"),
+            "id":               id,
+            "sender_id":        senderID,
+            "recipient_id":     recipientID,
+            "name":             sName, // for backward compatibility in Incoming list
+            "avatar":           sAvatar,
+            "sender_name":      sName,
+            "sender_avatar":    sAvatar,
+            "receiver_name":    rName,
+            "receiver_avatar":  rAvatar,
+            "created_at":       createdAt.Format("2006-01-02 15:04:05"),
         })
     }
 
-    // Return empty array instead of null if no invites
     if invites == nil {
         invites = []map[string]interface{}{}
     }
 
-    fmt.Println("✅ Found", len(invites), "invites")
-
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(invites)
+}
+
+// -------------- DELETE/CANCEL INVITE ------------------
+func DeleteInvite(w http.ResponseWriter, r *http.Request) {
+    userIDStr := r.Context().Value(middleware.UserIDKey).(string)
+    userID, _ := strconv.Atoi(userIDStr)
+
+    vars := mux.Vars(r)
+    inviteID, err := strconv.Atoi(vars["id"])
+    if err != nil {
+        http.Error(w, "Invalid invite ID", http.StatusBadRequest)
+        return
+    }
+
+    fmt.Println("🗑️ Deleting invite:", inviteID, "requested by:", userID)
+
+    // Allow deletion if user is either the sender (cancel) or recipient (decline)
+    result, err := db.DB.Exec(context.Background(),
+        `DELETE FROM invites WHERE id = $1 AND (sender_id = $2 OR recipient_id = $2)`,
+        inviteID, userID,
+    )
+    if err != nil || result.RowsAffected() == 0 {
+        http.Error(w, "Invite not found or not yours", http.StatusNotFound)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"message": "Invite deleted"})
 }
 
 // -------------- ACCEPT INVITES ------------------

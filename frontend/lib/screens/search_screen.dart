@@ -22,6 +22,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Timer? _debounce;
   Timer? _statusPollingTimer; // Timer for checking acceptance status
   List<dynamic> _myFriends = [];
+  List<dynamic> _sentInvites = [];
 
   @override
   void initState() {
@@ -30,13 +31,24 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _loadFriends() async {
-    final friends = await _apiService.getFriends();
+    final results = await Future.wait([
+      _apiService.getFriends(),
+      _apiService.getSentInvites(),
+    ]);
+    
     if (mounted) {
       setState(() {
-        _myFriends = friends;
+        _myFriends = results[0];
+        _sentInvites = results[1];
+        
         // If we found a user and they are now in the friend list, update state
         if (_foundUser != null) {
           _isAlreadyFriend = _myFriends.any((f) => f['id'] == _foundUser!['id']);
+          _isRequestSent = _sentInvites.any((inv) {
+            final receiverId = (inv['receiver_id'] ?? inv['receiverId'])?.toString();
+            return receiverId == _foundUser!['id']?.toString();
+          });
+          
           if (_isAlreadyFriend) {
             _stopPolling();
           }
@@ -91,6 +103,10 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() {
           _foundUser = user;
           _isAlreadyFriend = friend;
+          _isRequestSent = _sentInvites.any((inv) {
+            final receiverId = (inv['receiver_id'] ?? inv['receiverId'])?.toString();
+            return receiverId == user?['id']?.toString();
+          });
         });
         
         if (user == null) {
@@ -226,14 +242,23 @@ class _SearchScreenState extends State<SearchScreen> {
                   onPressed: (_isRequestSent || _isAlreadyFriend) 
                     ? null 
                     : () async {
-                        if (user['id'] == null) return;
+                        debugPrint("🔘 Button pressed! User ID: ${user['id']}");
+                        if (user['id'] == null) {
+                          debugPrint("❌ ABORT: user['id'] is NULL!");
+                          return;
+                        }
+                        
                         final success = await _apiService.sendFriendRequest(user['id']);
+                        debugPrint("🔘 Request success: $success");
+                        
                         if (mounted && success) {
                           setState(() {
                             _isRequestSent = true;
                           });
                           _startPolling(); // Start watching for acceptance
                           UIUtils.showSuccess(context, 'Request sent!');
+                        } else if (mounted) {
+                          UIUtils.showError(context, 'Failed to send request.');
                         }
                       },
                   style: ElevatedButton.styleFrom(
@@ -256,9 +281,26 @@ class _SearchScreenState extends State<SearchScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  onPressed: () {
-                    _stopPolling();
-                    setState(() => _isRequestSent = false);
+                  onPressed: () async {
+                    // Find the invite ID to cancel
+                    final invite = _sentInvites.firstWhere(
+                      (inv) {
+                        final receiverId = (inv['receiver_id'] ?? inv['receiverId'])?.toString();
+                        return receiverId == user['id']?.toString();
+                      },
+                      orElse: () => null,
+                    );
+                    
+                    if (invite != null) {
+                      final success = await _apiService.cancelInvite(invite['id']);
+                      if (success) {
+                        _loadFriends(); // Refresh lists
+                        UIUtils.showSuccess(context, 'Request cancelled.');
+                      }
+                    } else {
+                      // If we don't have the ID yet (just sent), we can still reset local state
+                      setState(() => _isRequestSent = false);
+                    }
                   },
                 )
               ]

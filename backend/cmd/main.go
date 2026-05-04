@@ -38,6 +38,7 @@ func main() {
 	protected.HandleFunc("/locations", handlers.UpdateLocation).Methods("POST")
 	protected.HandleFunc("/invites/{user_id}", handlers.SendInvite).Methods("POST") // invites + receipeint ID in URL
 	protected.HandleFunc("/invites", handlers.GetInvites).Methods("GET")
+	protected.HandleFunc("/invites/{id}", handlers.DeleteInvite).Methods("DELETE")
 	protected.HandleFunc("/invites/{id}/accept", (handlers.AcceptInvite)).Methods("POST")
 	protected.HandleFunc("/invites/{id}/decline", (handlers.DeclineInvite)).Methods("POST")
 	protected.HandleFunc("/friends", handlers.GetFriends).Methods("GET")

@@ -5,17 +5,22 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
 class MarkerUtils {
+  static final Map<String, BitmapDescriptor> _markerCache = {};
+
+  static String _getMarkerKey(String? url, String name, Color color, bool hasStar) {
+    return '${url ?? ''}_${name}_${color.value}_$hasStar';
+  }
+
+  static String _getGroupMarkerKey(List<Map<String, dynamic>> users) {
+    final ids = users.map((u) => u['id'].toString()).toList()..sort();
+    return ids.join(',');
+  }
   static Future<ui.Image?> _loadAvatarImage(String? url, int size) async {
     if (url == null || url.isEmpty) return null;
     try {
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
-        final ui.Codec codec = await ui.instantiateImageCodec(
-          response.bodyBytes, 
-          targetWidth: size, 
-        );
-        final ui.FrameInfo fi = await codec.getNextFrame();
-        return fi.image;
+        return await decodeImageFromList(response.bodyBytes);
       }
     } catch (e) {
       debugPrint("Error loading avatar image: $e");
@@ -32,6 +37,9 @@ class MarkerUtils {
     int size = 120,
     bool hasStar = false,
   }) async {
+    final String key = _getMarkerKey(url, name, color, hasStar);
+    if (_markerCache.containsKey(key)) return _markerCache[key]!;
+
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
     final double radius = size / 2.0;
@@ -55,13 +63,7 @@ class MarkerUtils {
       try {
         final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
         if (response.statusCode == 200) {
-          final ui.Codec codec = await ui.instantiateImageCodec(
-            response.bodyBytes, 
-            targetWidth: (size - 12).toInt(), 
-          );
-          final ui.FrameInfo fi = await codec.getNextFrame();
-          
-          final ui.Image image = fi.image;
+          final ui.Image image = await decodeImageFromList(response.bodyBytes);
           
           canvas.save();
           final Rect imageRect = Rect.fromCircle(center: Offset(radius, radius), radius: radius - 6);
@@ -74,6 +76,7 @@ class MarkerUtils {
             fit: BoxFit.cover,
           );
           canvas.restore();
+          image.dispose(); // Dispose avatar image
           imageLoaded = true;
         }
       } catch (e) {
@@ -129,7 +132,13 @@ class MarkerUtils {
 
     final ui.Image markerAsImage = await pictureRecorder.endRecording().toImage(size, size + 10);
     final byteData = await markerAsImage.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    
+    // Explicit disposal
+    markerAsImage.dispose();
+    
+    final descriptor = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    _markerCache[key] = descriptor;
+    return descriptor;
   }
 
   /// Creates a composite marker showing up to 3 overlapping avatars/badges for a cluster.
@@ -137,6 +146,9 @@ class MarkerUtils {
     List<Map<String, dynamic>> users, {
     int size = 120,
   }) async {
+    final String key = _getGroupMarkerKey(users);
+    if (_markerCache.containsKey(key)) return _markerCache[key]!;
+
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
     
@@ -210,6 +222,7 @@ class MarkerUtils {
             fit: BoxFit.cover,
           );
           canvas.restore();
+          image.dispose(); // Dispose avatar image
         } else {
           final TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
           textPainter.text = TextSpan(
@@ -257,6 +270,12 @@ class MarkerUtils {
     
     final ui.Image markerAsImage = await pictureRecorder.endRecording().toImage(totalWidth.toInt(), size + 10);
     final byteData = await markerAsImage.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    
+    // Explicit disposal
+    markerAsImage.dispose();
+    
+    final descriptor = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    _markerCache[key] = descriptor;
+    return descriptor;
   }
 }
