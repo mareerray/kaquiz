@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/ui_utils.dart';
+import '../utils/marker_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'login_screen.dart';
 
@@ -74,6 +75,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // 3. Update local session
         _session.name = _nameController.text.trim();
         _session.avatar = avatarUrl;
+
+        MarkerUtils.clearCache();
         
         UIUtils.showSuccess(context, "Profile updated successfully! ✨");
         setState(() => _selectedImage = null);
@@ -104,6 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         url,
       );
       if (success) {
+        MarkerUtils.clearCache();
         setState(() => _session.avatar = url); // show new avatar immediately
         _session.avatar = url;            // keep session in sync
         _session.name = _nameController.text.trim(); // also update name in session just in case

@@ -7,6 +7,10 @@ import 'package:http/http.dart' as http;
 class MarkerUtils {
   static final Map<String, BitmapDescriptor> _markerCache = {};
 
+  static void clearCache() {
+    _markerCache.clear();
+  }
+
   static String _getMarkerKey(String? url, String name, Color color, bool hasStar) {
     return '${url ?? ''}_${name}_${color.value}_$hasStar';
   }
