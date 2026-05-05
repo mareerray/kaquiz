@@ -23,6 +23,9 @@ class AuthService {
   /// Triggers the Google Sign In flow and returns the idToken
  Future<String?> signInWithGoogle() async {
     try {
+      
+      await _googleSignIn.signOut();
+      
       // final String rawNonce = _generateNonce();
       // final String hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
