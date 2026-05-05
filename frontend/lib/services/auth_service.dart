@@ -65,7 +65,12 @@ class AuthService {
   }
   /// Signs out of Google
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
+    try {
+      await _googleSignIn.signOut();
+      await _googleSignIn.disconnect(); // This forces account selection next time!
+    } catch (e) {
+      debugPrint("⚠️ Google disconnect error: $e");
+    }
     await Supabase.instance.client.auth.signOut();
   }
 }
