@@ -175,10 +175,28 @@ class _MapScreenState extends State<MapScreen> {
         final List<Map<String, dynamic>> typedGroup = List<Map<String, dynamic>>.from(group);
         final icon = await MarkerUtils.getGroupAvatarMarker(typedGroup);
         
-        // Create a summary title for the info window
-        List<String> names = group.take(3).map((u) => (u['name'] ?? 'Unknown').toString()).toList();
-        String title = names.join(', ');
-        if (group.length > 3) title += ' and ${group.length - 3} others';
+        // Create a summary snippet with status for each friend in the cluster
+        List<String> details = [];
+        for (var u in group.take(3)) {
+          String name = (u['name'] ?? 'Unknown').toString();
+          String statusStr = 'Active';
+          if (u['last_seen'] != null) {
+            try {
+              DateTime ls = DateTime.parse(u['last_seen'].toString());
+              // Use a more compact version for clusters
+              final now = DateTime.now().toUtc();
+              final diff = now.difference(ls.toUtc());
+              if (diff.inMinutes < 1) statusStr = 'Just now';
+              else if (diff.inMinutes < 60) statusStr = '${diff.inMinutes}m ago';
+              else if (diff.inHours < 24) statusStr = '${diff.inHours}h ago';
+              else statusStr = 'Yesterday';
+            } catch (_) {}
+          }
+          details.add('$name ($statusStr)');
+        }
+        
+        String snippet = details.join(', ');
+        if (group.length > 3) snippet += ' and ${group.length - 3} others';
 
         newMarkers.add(
           Marker(
@@ -187,8 +205,8 @@ class _MapScreenState extends State<MapScreen> {
             icon: icon,
             zIndex: includesMe ? 10.0 : 5.0,
             infoWindow: InfoWindow(
-              title: '$count friends here',
-              snippet: title,
+              title: '${group.length} friends here',
+              snippet: snippet,
             ),
           ),
         );
