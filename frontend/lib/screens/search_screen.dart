@@ -312,7 +312,11 @@ class _SearchScreenState extends State<SearchScreen> {
                         setState(() => _isActionLoading = false);
                       },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isAlreadyFriend ? Colors.green : (_isIncomingRequest ? Colors.purple : (_isRequestSent ? Colors.orange : Colors.blue)),
+                    backgroundColor: _isAlreadyFriend 
+                        ? Colors.green 
+                        : (_isIncomingRequest 
+                            ? Colors.deepPurple 
+                            : (_isRequestSent ? Colors.grey : Colors.deepPurple)),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

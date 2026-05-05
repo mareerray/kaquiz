@@ -1,10 +1,11 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -26,10 +27,6 @@ class AuthService {
       final String hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
       // On iOS, we need to pass the nonce to Google Sign In
-      // Note: If your google_sign_in version doesn't support 'nonce' in signIn(),
-      // it might be handled automatically or requires a different approach.
-      // But we will pass it to Supabase regardless.
-      // @ts-ignore
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
       if (account == null) {
