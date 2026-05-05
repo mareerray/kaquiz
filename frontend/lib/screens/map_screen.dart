@@ -177,13 +177,13 @@ class _MapScreenState extends State<MapScreen> {
         
         // Create a summary snippet with status for each friend in the cluster
         List<String> details = [];
-        for (var u in group.take(3)) {
+        // Increase limit to 5 for a better list view
+        for (var u in group.take(5)) {
           String name = (u['name'] ?? 'Unknown').toString();
           String statusStr = 'Active';
           if (u['last_seen'] != null) {
             try {
               DateTime ls = DateTime.parse(u['last_seen'].toString());
-              // Use a more compact version for clusters
               final now = DateTime.now().toUtc();
               final diff = now.difference(ls.toUtc());
               if (diff.inMinutes < 1) statusStr = 'Just now';
@@ -195,8 +195,9 @@ class _MapScreenState extends State<MapScreen> {
           details.add('$name ($statusStr)');
         }
         
-        String snippet = details.join(', ');
-        if (group.length > 3) snippet += ' and ${group.length - 3} others';
+        // Use \n for a list-like appearance
+        String snippet = details.join('\n');
+        if (group.length > 5) snippet += '\nand ${group.length - 5} others';
 
         newMarkers.add(
           Marker(
