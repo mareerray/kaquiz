@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:convert';
-import 'dart:math';
-import 'package:crypto/crypto.dart';
+// import 'dart:convert';
+// import 'dart:math';
+// import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
@@ -13,18 +13,18 @@ class AuthService {
     serverClientId: dotenv.env['WEB_CLIENT_ID'],
   );
 
-  /// Generates a random nonce for secure authentication
-  String _generateNonce([int length = 32]) {
-    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
-    final random = Random.secure();
-    return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
-  }
+  // /// Generates a random nonce for secure authentication
+  // String _generateNonce([int length = 32]) {
+  //   const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+  //   final random = Random.secure();
+  //   return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
+  // }
 
   /// Triggers the Google Sign In flow and returns the idToken
  Future<String?> signInWithGoogle() async {
     try {
-      final String rawNonce = _generateNonce();
-      final String hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+      // final String rawNonce = _generateNonce();
+      // final String hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
       // On iOS, we need to pass the nonce to Google Sign In
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
@@ -44,23 +44,18 @@ class AuthService {
       debugPrint("🟢 Got idToken: ${idToken != null ? 'YES ✅' : 'NULL ❌'}");
       debugPrint("🟢 Got accessToken: ${accessToken != null ? 'YES ✅' : 'NULL ❌'}");
 
-      if (idToken == null) {
-        debugPrint("🔴 No Google idToken found");
+      if (idToken == null || accessToken == null) {
+        debugPrint("🔴 Missing Google idToken or accessToken");
         return null;
       }
 
-      try {
-        await Supabase.instance.client.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: idToken,
-          nonce: rawNonce, // Passing the raw nonce here!
-        );
-        debugPrint("🟢 Supabase login SUCCESS: ${Supabase.instance.client.auth.currentUser?.id}");
-      } catch (supabaseError) {
-        // If it still fails, it's likely because the google_sign_in plugin 
-        // doesn't support setting a custom nonce yet, or uses a different one.
-        debugPrint("⚠️ Supabase login could not verify nonce, but main flow is fine: $supabaseError");
-      }
+      
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken, // Passing the raw nonce here!
+      );
+      debugPrint("🟢 Supabase login SUCCESS: ${Supabase.instance.client.auth.currentUser?.id}");
 
       return idToken;
     } catch (e) {
