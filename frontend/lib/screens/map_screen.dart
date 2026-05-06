@@ -187,7 +187,8 @@ class _MapScreenState extends State<MapScreen> {
         List<String> details = [];
         // Increase limit to 5 for a better list view
         for (var u in typedGroup.take(5)) {
-          String name = (u['name'] ?? 'Unknown').toString();
+          bool isMe = u['is_me'] == true;
+          String name = isMe ? 'You' : (u['name'] ?? 'Unknown').toString();
           String statusStr = 'Active';
           if (u['last_seen'] != null) {
             try {
@@ -207,6 +208,14 @@ class _MapScreenState extends State<MapScreen> {
         String snippet = details.join('\n');
         if (group.length > 5) snippet += '\nand ${group.length - 5} others';
 
+        String infoTitle = '';
+        if (includesMe) {
+          if (group.length == 2) infoTitle = 'You and 1 friend here';
+          else infoTitle = 'You and ${group.length - 1} friends here';
+        } else {
+          infoTitle = '${group.length} friends here';
+        }
+
         newMarkers.add(
           Marker(
             markerId: MarkerId('cluster_${lat}_$lng'),
@@ -214,7 +223,7 @@ class _MapScreenState extends State<MapScreen> {
             icon: icon,
             zIndex: includesMe ? 10.0 : 5.0,
             infoWindow: InfoWindow(
-              title: '${group.length} friends here',
+              title: infoTitle,
               snippet: snippet,
             ),
           ),
