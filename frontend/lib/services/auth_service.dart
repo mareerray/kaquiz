@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// import 'dart:convert';
-// import 'dart:math';
-// import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
@@ -13,21 +10,13 @@ class AuthService {
     serverClientId: dotenv.env['WEB_CLIENT_ID'],
   );
 
-  // /// Generates a random nonce for secure authentication
-  // String _generateNonce([int length = 32]) {
-  //   const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
-  //   final random = Random.secure();
-  //   return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
-  // }
 
   /// Triggers the Google Sign In flow and returns the idToken
  Future<String?> signInWithGoogle() async {
     try {
-      
+
       await _googleSignIn.signOut();
       
-      // final String rawNonce = _generateNonce();
-      // final String hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
       // On iOS, we need to pass the nonce to Google Sign In
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
@@ -66,6 +55,7 @@ class AuthService {
       return null;
     }
   }
+  
   /// Signs out of Google
   Future<void> signOut() async {
     try {

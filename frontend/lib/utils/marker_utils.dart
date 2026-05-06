@@ -6,9 +6,19 @@ import 'package:http/http.dart' as http;
 
 class MarkerUtils {
   static final Map<String, BitmapDescriptor> _markerCache = {};
+  static final Map<String, DateTime> _markerCacheTime = {};
+  static const Duration _cacheDuration = Duration(minutes: 1);
 
+  // Полная очистка кэша (вызывается после смены своей аватарки)
   static void clearCache() {
     _markerCache.clear();
+    _markerCacheTime.clear();
+  }
+
+  static bool _isCacheValid(String key) {
+    final cachedTime = _markerCacheTime[key];
+    if (cachedTime == null) return false;
+    return DateTime.now().difference(cachedTime) < _cacheDuration;
   }
 
   static String _getMarkerKey(String? url, String name, Color color, bool hasStar) {
@@ -19,6 +29,7 @@ class MarkerUtils {
     final ids = users.map((u) => u['id'].toString()).toList()..sort();
     return ids.join(',');
   }
+
   static Future<ui.Image?> _loadAvatarImage(String? url, int size) async {
     if (url == null || url.isEmpty) return null;
     try {
@@ -32,8 +43,6 @@ class MarkerUtils {
     return null;
   }
 
-  /// Creates a circular avatar marker from a URL.
-  /// If URL is null or loading fails, falls back to an initial-based circle.
   static Future<BitmapDescriptor> getAvatarMarker({
     String? url,
     required String name,
@@ -42,7 +51,14 @@ class MarkerUtils {
     bool hasStar = false,
   }) async {
     final String key = _getMarkerKey(url, name, color, hasStar);
-    if (_markerCache.containsKey(key)) return _markerCache[key]!;
+
+    // Свой маркер (hasStar) кэшируем до явной очистки
+    // Маркеры друзей кэшируем на 1 минуту
+    if (_markerCache.containsKey(key)) {
+      if (hasStar || _isCacheValid(key)) {
+        return _markerCache[key]!;
+      }
+    }
 
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
@@ -68,7 +84,7 @@ class MarkerUtils {
         final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
         if (response.statusCode == 200) {
           final ui.Image image = await decodeImageFromList(response.bodyBytes);
-          
+
           canvas.save();
           final Rect imageRect = Rect.fromCircle(center: Offset(radius, radius), radius: radius - 6);
           final Path path = Path()..addOval(imageRect);
@@ -80,7 +96,7 @@ class MarkerUtils {
             fit: BoxFit.cover,
           );
           canvas.restore();
-          image.dispose(); // Dispose avatar image
+          image.dispose();
           imageLoaded = true;
         }
       } catch (e) {
@@ -109,16 +125,13 @@ class MarkerUtils {
     if (hasStar) {
       final double starRadius = radius * 0.4;
       final Offset starPos = Offset(radius * 1.6, radius * 0.4);
-      
-      // Star Background (Border)
+
       final Paint starBorderPaint = Paint()..color = Colors.white;
       canvas.drawCircle(starPos, starRadius, starBorderPaint);
-      
-      // Star Inner (Gold)
+
       final Paint starPaint = Paint()..color = Colors.amber;
       canvas.drawCircle(starPos, starRadius - 2, starPaint);
-      
-      // Star Icon
+
       TextPainter starIconPainter = TextPainter(textDirection: TextDirection.ltr);
       starIconPainter.text = TextSpan(
         text: '★',
@@ -136,38 +149,37 @@ class MarkerUtils {
 
     final ui.Image markerAsImage = await pictureRecorder.endRecording().toImage(size, size + 10);
     final byteData = await markerAsImage.toByteData(format: ui.ImageByteFormat.png);
-    
-    // Explicit disposal
     markerAsImage.dispose();
-    
+
     final descriptor = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
     _markerCache[key] = descriptor;
+    _markerCacheTime[key] = DateTime.now();
     return descriptor;
   }
 
-  /// Creates a composite marker showing up to 3 overlapping avatars/badges for a cluster.
   static Future<BitmapDescriptor> getGroupAvatarMarker(
     List<Map<String, dynamic>> users, {
     int size = 120,
   }) async {
     final String key = _getGroupMarkerKey(users);
-    if (_markerCache.containsKey(key)) return _markerCache[key]!;
+
+    // Группавой маркер кэшируем на 1 минуту
+    if (_markerCache.containsKey(key) && _isCacheValid(key)) {
+      return _markerCache[key]!;
+    }
 
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
-    
+
     final double radius = size / 2.0;
-    
-    // We display max 3 circles: user[0], user[1], and a "+N" badge if more than 2 users.
+
     int displayCount = users.length > 2 ? 3 : users.length;
-    // Calculate total width of the canvas (circles overlap by 40%)
     double totalWidth = size + (displayCount - 1) * (size * 0.6);
-    
-    // Draw from right to left so left (index 0) is on top
+
     for (int i = displayCount - 1; i >= 0; i--) {
       bool isBadge = (i == 2 && users.length > 2);
       Map<String, dynamic>? user = isBadge ? null : users[i];
-      
+
       double centerX = radius + (i * (size * 0.6));
       double centerY = radius;
       Offset center = Offset(centerX, centerY);
@@ -186,7 +198,7 @@ class MarkerUtils {
       if (isBadge) {
         final Paint badgePaint = Paint()..color = Colors.grey.shade300;
         canvas.drawCircle(center, radius - 6, badgePaint);
-        
+
         final String badgeText = '+${users.length - 2}';
         final TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
         textPainter.text = TextSpan(
@@ -205,15 +217,15 @@ class MarkerUtils {
       } else {
         final bool isMe = user!['is_me'] == true;
         final Color color = isMe ? Colors.blueAccent : Colors.deepPurple;
-        
+
         final Paint innerPaint = Paint()..color = color;
         canvas.drawCircle(center, radius - 6, innerPaint);
-        
+
         final String? avatarUrl = user['avatar'];
         final String name = user['name'] ?? 'Unknown';
-        
+
         ui.Image? image = await _loadAvatarImage(avatarUrl, (size - 12).toInt());
-        
+
         if (image != null) {
           canvas.save();
           final Rect imageRect = Rect.fromCircle(center: center, radius: radius - 6);
@@ -226,7 +238,7 @@ class MarkerUtils {
             fit: BoxFit.cover,
           );
           canvas.restore();
-          image.dispose(); // Dispose avatar image
+          image.dispose();
         } else {
           final TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
           textPainter.text = TextSpan(
@@ -243,18 +255,17 @@ class MarkerUtils {
             Offset(centerX - (textPainter.width / 2), centerY - (textPainter.height / 2)),
           );
         }
-        
-        // 4. Draw Star Badge if needed
+
         if (isMe) {
           final double starRadius = radius * 0.4;
           final Offset starPos = Offset(centerX + radius * 0.6, centerY - radius * 0.6);
-          
+
           final Paint starBorderPaint = Paint()..color = Colors.white;
           canvas.drawCircle(starPos, starRadius, starBorderPaint);
-          
+
           final Paint starPaint = Paint()..color = Colors.amber;
           canvas.drawCircle(starPos, starRadius - 2, starPaint);
-          
+
           TextPainter starIconPainter = TextPainter(textDirection: TextDirection.ltr);
           starIconPainter.text = TextSpan(
             text: '★',
@@ -271,15 +282,14 @@ class MarkerUtils {
         }
       }
     }
-    
+
     final ui.Image markerAsImage = await pictureRecorder.endRecording().toImage(totalWidth.toInt(), size + 10);
     final byteData = await markerAsImage.toByteData(format: ui.ImageByteFormat.png);
-    
-    // Explicit disposal
     markerAsImage.dispose();
-    
+
     final descriptor = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
     _markerCache[key] = descriptor;
+    _markerCacheTime[key] = DateTime.now();
     return descriptor;
   }
 }

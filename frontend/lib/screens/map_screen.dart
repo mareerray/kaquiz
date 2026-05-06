@@ -173,12 +173,20 @@ class _MapScreenState extends State<MapScreen> {
         
         // Generate group marker using Canvas collage
         final List<Map<String, dynamic>> typedGroup = List<Map<String, dynamic>>.from(group);
+        
+        // Sort: "Me" always goes first in the list (on top of collage)
+        typedGroup.sort((a, b) {
+          if (a['is_me'] == true) return -1;
+          if (b['is_me'] == true) return 1;
+          return 0;
+        });
+
         final icon = await MarkerUtils.getGroupAvatarMarker(typedGroup);
         
         // Create a summary snippet with status for each friend in the cluster
         List<String> details = [];
         // Increase limit to 5 for a better list view
-        for (var u in group.take(5)) {
+        for (var u in typedGroup.take(5)) {
           String name = (u['name'] ?? 'Unknown').toString();
           String statusStr = 'Active';
           if (u['last_seen'] != null) {
